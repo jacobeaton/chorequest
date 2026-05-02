@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAppState } from '../../hooks/useAppState'
 import { CHARACTERS } from '../../config/characters'
+import { storage } from '../../utils/storage'
 import { ArrowLeft, Lock, Trash2, Edit2, CheckCircle, XCircle, Star } from 'lucide-react'
 
 export default function ParentModeScreen({ onNavigate }) {
@@ -216,9 +217,43 @@ export default function ParentModeScreen({ onNavigate }) {
                 <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${settings.soundOn ? 'translate-x-6' : 'translate-x-0'}`} />
               </button>
             </div>
+
+            <WipeDataButton onNavigate={onNavigate} />
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+function WipeDataButton() {
+  const [confirm, setConfirm] = useState(false)
+
+  const handleWipe = () => {
+    storage.clearAll()
+    window.location.reload()
+  }
+
+  return (
+    <div className="bg-red-50 border border-red-200 rounded-2xl p-4 space-y-3">
+      <div>
+        <p className="font-bold text-red-700">Wipe All Data</p>
+        <p className="text-xs text-red-400">Deletes everything and restarts from scratch. Cannot be undone.</p>
+      </div>
+      {confirm ? (
+        <div className="flex gap-2">
+          <button onClick={handleWipe} className="flex-1 bg-red-500 text-white font-black py-2 rounded-xl text-sm active:scale-95 transition-transform">
+            Yes, wipe it all
+          </button>
+          <button onClick={() => setConfirm(false)} className="flex-1 bg-gray-100 text-gray-600 font-bold py-2 rounded-xl text-sm">
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button onClick={() => setConfirm(true)} className="w-full bg-red-100 text-red-600 font-black py-2 rounded-xl text-sm active:scale-95 transition-transform">
+          🗑️ Wipe Data
+        </button>
+      )}
     </div>
   )
 }
