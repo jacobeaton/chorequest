@@ -167,21 +167,32 @@ export const AppProvider = ({ children }) => {
   const approvePhoto = useCallback((photoId) => {
     const ownedIds = characters.map(c => c.id)
     const pulledId = attemptPull(ownedIds, kid?.totalXpEarned ?? 0)
-
+    // pullResult = characterId on hit, null on miss (kid gets coins instead)
     setPhotoQueueState(prev => prev.map(p =>
       p.id === photoId ? { ...p, status: 'approved', pullResult: pulledId } : p
     ))
-
-    if (pulledId) {
-      setCharactersState(prev => [...prev, makeCharacterEntry(pulledId)])
-    }
-
     return pulledId
   }, [characters, kid])
 
+  const claimPhotoReward = useCallback((photoId) => {
+    const photo = photoQueue.find(p => p.id === photoId)
+    if (!photo || photo.status !== 'approved' || photo.claimed) return
+
+    if (photo.pullResult) {
+      setCharactersState(prev => [...prev, makeCharacterEntry(photo.pullResult)])
+    } else {
+      setKidState(prev => ({ ...prev, coins: prev.coins + BALANCE.cleanRoomCoins }))
+    }
+
+    // Clear photo data from storage, mark claimed
+    setPhotoQueueState(prev => prev.map(p =>
+      p.id === photoId ? { ...p, claimed: true, photoDataUrl: null } : p
+    ))
+  }, [photoQueue])
+
   const rejectPhoto = useCallback((photoId) => {
     setPhotoQueueState(prev => prev.map(p =>
-      p.id === photoId ? { ...p, status: 'rejected' } : p
+      p.id === photoId ? { ...p, status: 'rejected', photoDataUrl: null } : p
     ))
   }, [])
 
@@ -202,15 +213,16 @@ export const AppProvider = ({ children }) => {
   }, [])
 
   const pendingPhotoCount = photoQueue.filter(p => p.status === 'pending').length
+  const unclaimedPhoto = photoQueue.find(p => p.status === 'approved' && !p.claimed) ?? null
 
   return (
     <AppContext.Provider value={{
       kid, characters, activeCharacterId, activeCharacter,
       chores, completions, streaks, photoQueue, settings, purchaseHistory,
-      pendingPhotoCount,
+      pendingPhotoCount, unclaimedPhoto,
       setupKid, addChore, updateChore, deleteChore,
       completeChore, buyItem,
-      submitPhoto, approvePhoto, rejectPhoto,
+      submitPhoto, approvePhoto, rejectPhoto, claimPhotoReward,
       setActiveCharacter, renameCharacter, updateSettings,
     }}>
       {children}

@@ -8,7 +8,7 @@ import ChoreCard from '../shared/ChoreCard'
 import { Settings, Camera, Star } from 'lucide-react'
 
 export default function HomeScreen({ onNavigate }) {
-  const { kid, activeCharacter, activeCharacterId, chores, streaks, pendingPhotoCount } = useAppState()
+  const { kid, activeCharacter, activeCharacterId, chores, streaks, pendingPhotoCount, unclaimedPhoto } = useAppState()
   const char = CHARACTERS[activeCharacterId]
   if (!char || !activeCharacter) return null
 
@@ -78,18 +78,32 @@ export default function HomeScreen({ onNavigate }) {
           </div>
         </div>
 
-        {/* Submit room photo */}
-        <button
-          onClick={() => onNavigate('photo')}
-          className="w-full flex items-center gap-3 bg-gradient-to-r from-pink-100 to-rose-100 border-2 border-pink-200 rounded-2xl p-4 active:scale-95 transition-transform"
-        >
-          <Camera size={28} className="text-pink-500 flex-shrink-0" />
-          <div className="text-left">
-            <p className="font-black text-pink-700">Clean Room Photo</p>
-            <p className="text-xs text-pink-400">Submit daily for a chance to find a new companion!</p>
-          </div>
-          <span className="ml-auto text-2xl">✨</span>
-        </button>
+        {/* Submit room photo / unclaimed result */}
+        {unclaimedPhoto ? (
+          <button
+            onClick={() => onNavigate('photo')}
+            className="w-full flex items-center gap-3 bg-gradient-to-r from-indigo-100 to-blue-100 border-2 border-blue-300 rounded-2xl p-4 active:scale-95 transition-transform animate-pulse"
+          >
+            <span className="text-3xl flex-shrink-0">✨</span>
+            <div className="text-left">
+              <p className="font-black text-blue-700">Something's waiting for you!</p>
+              <p className="text-xs text-blue-400">Your room photo was reviewed — tap to see what you found!</p>
+            </div>
+            <span className="ml-auto text-2xl">👆</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => onNavigate('photo')}
+            className="w-full flex items-center gap-3 bg-gradient-to-r from-pink-100 to-rose-100 border-2 border-pink-200 rounded-2xl p-4 active:scale-95 transition-transform"
+          >
+            <Camera size={28} className="text-pink-500 flex-shrink-0" />
+            <div className="text-left">
+              <p className="font-black text-pink-700">Clean Room Photo</p>
+              <p className="text-xs text-pink-400">Submit daily for a chance to find a new companion!</p>
+            </div>
+            <span className="ml-auto text-2xl">✨</span>
+          </button>
+        )}
       </div>
 
       {/* Bottom nav */}

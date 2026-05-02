@@ -35,6 +35,7 @@ export const BALANCE = {
   },
 
   accountXpPerLevel: 500,
+  cleanRoomCoins: 20,
 }
 
 export const SHOP_ITEMS = {
