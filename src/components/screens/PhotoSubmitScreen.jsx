@@ -36,15 +36,23 @@ function PhotoResultScreen({ photo, onNavigate }) {
   const { claimPhotoReward } = useAppState()
   // stage: 'photo' → 'flash' → 'reveal'
   const [stage, setStage] = useState('photo')
+  // Capture these at mount — don't re-read from photo prop after claiming clears photoDataUrl
   const isCharacter = !!photo.pullResult
   const char = isCharacter ? CHARACTERS[photo.pullResult] : null
   const pos = getShinyPos(photo.id)
+  const photoId = photo.id
 
   const handleShinyTap = () => {
     if (stage !== 'photo') return
-    claimPhotoReward(photo.id)
+    // Don't claim yet — claiming makes unclaimedPhoto null which would unmount this component.
+    // Claim happens on exit once the reveal is done.
     setStage('flash')
     setTimeout(() => setStage('reveal'), 600)
+  }
+
+  const handleExit = (dest) => {
+    claimPhotoReward(photoId)
+    onNavigate(dest)
   }
 
   // Flash screen
@@ -80,12 +88,12 @@ function PhotoResultScreen({ photo, onNavigate }) {
           </div>
 
           <button
-            onClick={() => onNavigate('lumin')}
+            onClick={() => handleExit('lumin')}
             className="mt-8 bg-white text-gray-900 font-black text-xl px-12 py-4 rounded-3xl shadow-2xl active:scale-95 transition-transform"
           >
             Meet {char.evolutionNames[0]}! 🎉
           </button>
-          <button onClick={() => onNavigate('home')} className="mt-3 text-white/50 text-sm font-semibold py-2">
+          <button onClick={() => handleExit('home')} className="mt-3 text-white/50 text-sm font-semibold py-2">
             Back Home
           </button>
         </div>
@@ -100,7 +108,7 @@ function PhotoResultScreen({ photo, onNavigate }) {
         <p className="text-teal-200 mt-3 text-lg font-semibold">Your room looks great!</p>
         <p className="text-teal-300/60 mt-1 text-sm">No new Lumin this time — keep cleaning for another chance!</p>
         <button
-          onClick={() => onNavigate('home')}
+          onClick={() => handleExit('home')}
           className="mt-10 bg-white text-teal-700 font-black text-xl px-12 py-4 rounded-3xl shadow-xl active:scale-95 transition-transform"
         >
           Back Home 🏠
