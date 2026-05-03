@@ -4,15 +4,19 @@ import { CHARACTERS } from '../../config/characters'
 import { storage } from '../../utils/storage'
 import { ArrowLeft, Lock, Trash2, Edit2, CheckCircle, XCircle, Star, Hourglass } from 'lucide-react'
 
+const REWARD_EMOJIS = ['🎮','🍕','🎬','🏖️','🛍️','🎢','💰','🎁','⭐','🚀','🏆','🎪','🎯','🎲','📱','🍦','🎠','🎡','🛒','💵']
+
 export default function ParentModeScreen({ onNavigate }) {
-  const { settings, updateSettings, chores, deleteChore, completions, photoQueue, approvePhoto, rejectPhoto, pendingCompletions, approveCompletion, rejectCompletion, pendingChoreCount } = useAppState()
+  const { settings, updateSettings, chores, deleteChore, completions, photoQueue, approvePhoto, rejectPhoto, pendingCompletions, approveCompletion, rejectCompletion, pendingChoreCount, customRewards, addCustomReward, deleteCustomReward, rewardRedemptions, fulfillRedemption, rejectRedemption, pendingRedemptionCount } = useAppState()
   const [pin, setPin] = useState('')
   const [unlocked, setUnlocked] = useState(false)
   const [pinError, setPinError] = useState(false)
-  const [tab, setTab] = useState('queue') // 'queue' | 'chores' | 'history' | 'settings'
+  const [tab, setTab] = useState('queue')
   const [changingPin, setChangingPin] = useState(false)
   const [newPin, setNewPin] = useState('')
   const [revealedPull, setRevealedPull] = useState({})
+  const [newReward, setNewReward] = useState({ name: '', emoji: '🎁', description: '', coinCost: 100 })
+  const [addingReward, setAddingReward] = useState(false)
 
   const handleUnlock = (e) => {
     e.preventDefault()
@@ -74,12 +78,14 @@ export default function ParentModeScreen({ onNavigate }) {
           <Lock size={18} className="text-gray-400" />
         </div>
         <div className="flex gap-1">
-          {['queue','chores','history','settings'].map(t => (
+          {['queue','chores','rewards','settings'].map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className={`flex-1 py-2 rounded-full text-xs font-bold capitalize transition-colors ${tab === t ? 'bg-white text-gray-700' : 'bg-white/15 text-white'}`}>
-              {t === 'queue' ? `📋 Queue${(pendingPhotos.length + pendingChoreCount) ? ` (${pendingPhotos.length + pendingChoreCount})` : ''}` :
-               t === 'chores' ? '📋 Chores' :
-               t === 'history' ? '📊 History' : '⚙️ Settings'}
+              className={`flex-1 py-2 rounded-full text-xs font-bold transition-colors ${tab === t ? 'bg-white text-gray-700' : 'bg-white/15 text-white'}`}>
+              {t === 'queue'
+                ? `📋${(pendingPhotos.length + pendingChoreCount + pendingRedemptionCount) ? ` (${pendingPhotos.length + pendingChoreCount + pendingRedemptionCount})` : ''}`
+                : t === 'chores' ? '📝 Chores'
+                : t === 'rewards' ? '🎁 Rewards'
+                : '⚙️ Settings'}
             </button>
           ))}
         </div>
@@ -185,23 +191,106 @@ export default function ParentModeScreen({ onNavigate }) {
           </div>
         )}
 
-        {tab === 'history' && (
-          <div className="space-y-2">
-            <p className="text-sm text-gray-400 mb-3">{completions.length} chores completed total</p>
-            {recentCompletions.map(c => {
-              const chore = { name: '(deleted)', emoji: '✅' }
-              const found = { name: c.choreId }
-              return (
-                <div key={c.id} className="bg-white rounded-2xl p-3 shadow-sm flex items-center gap-3">
-                  <span className="text-xl">✅</span>
-                  <div className="flex-1">
-                    <p className="font-bold text-gray-700 text-sm">Chore completed</p>
-                    <p className="text-xs text-gray-400">{new Date(c.timestamp).toLocaleDateString()} • +{c.pointsEarned} XP • +{c.coinsEarned} 🪙</p>
-                  </div>
-                  {c.bonusApplied && <Star size={14} className="text-yellow-400 fill-yellow-400 flex-shrink-0" />}
+        {tab === 'rewards' && (
+          <div className="space-y-4">
+            {/* Pending redemptions */}
+            {rewardRedemptions.filter(r => r.status === 'pending').length > 0 && (
+              <div>
+                <h3 className="font-black text-gray-700 text-sm uppercase tracking-wide mb-2">⏳ Pending Redemptions</h3>
+                <div className="space-y-2">
+                  {rewardRedemptions.filter(r => r.status === 'pending').map(r => (
+                    <div key={r.id} className="bg-white rounded-2xl p-4 shadow-sm space-y-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl">{r.rewardEmoji}</span>
+                        <div className="flex-1">
+                          <p className="font-black text-gray-800">{r.rewardName}</p>
+                          <p className="text-sm text-gray-500">{r.rewardDescription}</p>
+                          <p className="text-xs text-gray-400">{new Date(r.purchasedAt).toLocaleString()} • 🪙 {r.coinCost}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => fulfillRedemption(r.id)} className="flex-1 flex items-center justify-center gap-1 bg-green-500 text-white font-bold py-2 rounded-xl text-sm active:scale-95 transition-transform">
+                          <CheckCircle size={14} /> Fulfilled
+                        </button>
+                        <button onClick={() => rejectRedemption(r.id)} className="flex-1 flex items-center justify-center gap-1 bg-red-400 text-white font-bold py-2 rounded-xl text-sm active:scale-95 transition-transform">
+                          <XCircle size={14} /> Refund
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )
-            })}
+              </div>
+            )}
+
+            {/* Manage rewards */}
+            <div className="flex items-center justify-between">
+              <h3 className="font-black text-gray-700 text-sm uppercase tracking-wide">🎁 Your Rewards</h3>
+              <button onClick={() => setAddingReward(a => !a)} className="text-purple-600 font-bold text-sm">
+                {addingReward ? 'Cancel' : '+ Add'}
+              </button>
+            </div>
+
+            {addingReward && (
+              <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+                <input
+                  type="text" placeholder="Reward name (e.g. Movie Night)"
+                  value={newReward.name} onChange={e => setNewReward(r => ({ ...r, name: e.target.value }))}
+                  maxLength={30}
+                  className="w-full border-2 border-purple-100 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none focus:border-purple-400 text-sm"
+                />
+                <input
+                  type="text" placeholder="Description (e.g. Stay up 1 hour late)"
+                  value={newReward.description} onChange={e => setNewReward(r => ({ ...r, description: e.target.value }))}
+                  maxLength={50}
+                  className="w-full border-2 border-purple-100 rounded-xl px-3 py-2 text-gray-700 outline-none focus:border-purple-400 text-sm"
+                />
+                <div className="flex gap-2 items-center">
+                  <span className="text-sm font-bold text-gray-600">🪙 Coin cost:</span>
+                  <input
+                    type="number" min="1" max="9999"
+                    value={newReward.coinCost} onChange={e => setNewReward(r => ({ ...r, coinCost: Number(e.target.value) }))}
+                    className="w-24 border-2 border-purple-100 rounded-xl px-3 py-2 font-black text-gray-800 outline-none focus:border-purple-400 text-sm"
+                  />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-2">Pick an emoji:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {REWARD_EMOJIS.map(e => (
+                      <button key={e} type="button" onClick={() => setNewReward(r => ({ ...r, emoji: e }))}
+                        className={`text-xl p-1 rounded-lg ${newReward.emoji === e ? 'bg-purple-100 ring-2 ring-purple-400' : ''}`}>
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  disabled={!newReward.name.trim()}
+                  onClick={() => { addCustomReward(newReward); setNewReward({ name: '', emoji: '🎁', description: '', coinCost: 100 }); setAddingReward(false) }}
+                  className="w-full bg-purple-600 text-white font-black py-2 rounded-xl disabled:opacity-40 active:scale-95 transition-transform"
+                >
+                  Add Reward
+                </button>
+              </div>
+            )}
+
+            {customRewards.length === 0 && !addingReward ? (
+              <p className="text-center text-gray-400 py-8 text-sm">No rewards yet. Add one above!</p>
+            ) : (
+              <div className="space-y-2">
+                {customRewards.map(r => (
+                  <div key={r.id} className="bg-white rounded-2xl p-3 shadow-sm flex items-center gap-3">
+                    <span className="text-2xl">{r.emoji}</span>
+                    <div className="flex-1">
+                      <p className="font-bold text-gray-800 text-sm">{r.name}</p>
+                      <p className="text-xs text-gray-500">{r.description} • 🪙 {r.coinCost}</p>
+                    </div>
+                    <button onClick={() => deleteCustomReward(r.id)} className="text-red-400 p-1">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

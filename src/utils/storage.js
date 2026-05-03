@@ -10,6 +10,8 @@ const KEYS = {
   PHOTO_QUEUE: 'cq_photoQueue',
   SETTINGS: 'cq_settings',
   PURCHASE_HISTORY: 'cq_purchaseHistory',
+  CUSTOM_REWARDS: 'cq_customRewards',
+  REWARD_REDEMPTIONS: 'cq_rewardRedemptions',
 }
 
 const read = (key, fallback) => {
@@ -62,6 +64,12 @@ export const storage = {
 
   getPurchaseHistory: () => read(KEYS.PURCHASE_HISTORY, []),
   setPurchaseHistory: (v) => write(KEYS.PURCHASE_HISTORY, v),
+
+  getCustomRewards: () => read(KEYS.CUSTOM_REWARDS, []),
+  setCustomRewards: (v) => write(KEYS.CUSTOM_REWARDS, v),
+
+  getRewardRedemptions: () => read(KEYS.REWARD_REDEMPTIONS, []),
+  setRewardRedemptions: (v) => write(KEYS.REWARD_REDEMPTIONS, v),
 
   clearAll: () => Object.values(KEYS).forEach(k => localStorage.removeItem(k)),
 }

@@ -37,6 +37,8 @@ export const AppProvider = ({ children }) => {
   const [photoQueue, setPhotoQueueState] = useState(() => storage.getPhotoQueue())
   const [settings, setSettingsState] = useState(() => storage.getSettings())
   const [purchaseHistory, setPurchaseHistoryState] = useState(() => storage.getPurchaseHistory())
+  const [customRewards, setCustomRewardsState] = useState(() => storage.getCustomRewards())
+  const [rewardRedemptions, setRewardRedemptionsState] = useState(() => storage.getRewardRedemptions())
 
   useEffect(() => { storage.setKid(kid) }, [kid])
   useEffect(() => { storage.setCharacters(characters) }, [characters])
@@ -49,6 +51,8 @@ export const AppProvider = ({ children }) => {
   useEffect(() => { storage.setPhotoQueue(photoQueue) }, [photoQueue])
   useEffect(() => { storage.setSettings(settings) }, [settings])
   useEffect(() => { storage.setPurchaseHistory(purchaseHistory) }, [purchaseHistory])
+  useEffect(() => { storage.setCustomRewards(customRewards) }, [customRewards])
+  useEffect(() => { storage.setRewardRedemptions(rewardRedemptions) }, [rewardRedemptions])
 
   const activeCharacter = characters.find(c => c.id === activeCharacterId) ?? null
 
@@ -260,22 +264,64 @@ export const AppProvider = ({ children }) => {
     setSettingsState(prev => ({ ...prev, ...updates }))
   }, [])
 
+  // ─── Custom Rewards ───────────────────────────────────────────────────────
+
+  const addCustomReward = useCallback((reward) => {
+    setCustomRewardsState(prev => [...prev, { ...reward, id: nanoid(), createdAt: new Date().toISOString() }])
+  }, [])
+
+  const deleteCustomReward = useCallback((id) => {
+    setCustomRewardsState(prev => prev.filter(r => r.id !== id))
+  }, [])
+
+  const redeemCustomReward = useCallback((rewardId) => {
+    const reward = customRewards.find(r => r.id === rewardId)
+    if (!reward || !kid || kid.coins < reward.coinCost) return false
+    setKidState(prev => ({ ...prev, coins: prev.coins - reward.coinCost }))
+    setRewardRedemptionsState(prev => [...prev, {
+      id: nanoid(),
+      rewardId,
+      rewardName: reward.name,
+      rewardEmoji: reward.emoji,
+      rewardDescription: reward.description,
+      coinCost: reward.coinCost,
+      purchasedAt: new Date().toISOString(),
+      status: 'pending',
+    }])
+    return true
+  }, [customRewards, kid])
+
+  const fulfillRedemption = useCallback((redemptionId) => {
+    setRewardRedemptionsState(prev => prev.map(r => r.id === redemptionId ? { ...r, status: 'fulfilled' } : r))
+  }, [])
+
+  const rejectRedemption = useCallback((redemptionId) => {
+    const redemption = rewardRedemptions.find(r => r.id === redemptionId)
+    if (!redemption) return
+    // Refund coins
+    setKidState(prev => ({ ...prev, coins: prev.coins + redemption.coinCost }))
+    setRewardRedemptionsState(prev => prev.map(r => r.id === redemptionId ? { ...r, status: 'rejected' } : r))
+  }, [rewardRedemptions])
+
   const pendingPhotoCount = photoQueue.filter(p => p.status === 'pending').length
   const pendingChoreCount = pendingCompletions.filter(p => p.status === 'pending').length
   const unclaimedPhoto = photoQueue.find(p => p.status === 'approved' && !p.claimed) ?? null
   const latestApproval = recentApprovals[0] ?? null
+  const pendingRedemptionCount = rewardRedemptions.filter(r => r.status === 'pending').length
 
   return (
     <AppContext.Provider value={{
       kid, characters, activeCharacterId, activeCharacter,
       chores, completions, pendingCompletions, recentApprovals, latestApproval,
       streaks, photoQueue, settings, purchaseHistory,
-      lockedChoreIds, pendingPhotoCount, pendingChoreCount, unclaimedPhoto,
+      customRewards, rewardRedemptions,
+      lockedChoreIds, pendingPhotoCount, pendingChoreCount, pendingRedemptionCount, unclaimedPhoto,
       setupKid, addChore, updateChore, deleteChore,
       completeChore, approveCompletion, rejectCompletion, dismissApproval,
       buyItem,
       submitPhoto, approvePhoto, rejectPhoto, claimPhotoReward,
       setActiveCharacter, renameCharacter, updateSettings,
+      addCustomReward, deleteCustomReward, redeemCustomReward, fulfillRedemption, rejectRedemption,
     }}>
       {children}
     </AppContext.Provider>

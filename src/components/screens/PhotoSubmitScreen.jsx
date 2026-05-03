@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useAppState } from '../../hooks/useAppState'
 import { CHARACTERS } from '../../config/characters'
 import { BALANCE } from '../../config/balance'
@@ -6,103 +6,150 @@ import LuminSVG from '../lumins/LuminSVG'
 import ConfettiOverlay from '../shared/ConfettiOverlay'
 import { ArrowLeft, Camera } from 'lucide-react'
 
-// Deterministic position from photo id so it's the same every render
 const getShinyPos = (id) => {
   const hash = id.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
-  return {
-    x: 20 + (hash % 50),
-    y: 20 + ((hash * 13) % 50),
-  }
+  return { x: 20 + (hash % 50), y: 20 + ((hash * 13) % 50) }
 }
+
+const rarityTextColor = {
+  common: 'text-gray-300',
+  uncommon: 'text-green-400',
+  rare: 'text-blue-300',
+  legendary: 'text-yellow-300',
+}
+const rarityBg = {
+  common: 'from-gray-700 to-gray-900',
+  uncommon: 'from-green-800 to-emerald-900',
+  rare: 'from-blue-800 to-indigo-900',
+  legendary: 'from-purple-800 to-violet-900',
+}
+const rarityLabel = {
+  common: 'COMMON',
+  uncommon: '🟢 UNCOMMON',
+  rare: '💎 RARE',
+  legendary: '⚡ LEGENDARY',
+}
+
+// ─── Photo result (approved, unclaimed) ──────────────────────────────────────
 
 function PhotoResultScreen({ photo, onNavigate }) {
   const { claimPhotoReward } = useAppState()
-  const [tapped, setTapped] = useState(false)
-  const [claimed, setClaimed] = useState(false)
+  // stage: 'photo' → 'flash' → 'reveal'
+  const [stage, setStage] = useState('photo')
   const isCharacter = !!photo.pullResult
   const char = isCharacter ? CHARACTERS[photo.pullResult] : null
   const pos = getShinyPos(photo.id)
 
-  const handleTap = () => {
-    if (tapped) return
-    setTapped(true)
+  const handleShinyTap = () => {
+    if (stage !== 'photo') return
     claimPhotoReward(photo.id)
-    setTimeout(() => setClaimed(true), 600)
+    setStage('flash')
+    setTimeout(() => setStage('reveal'), 600)
   }
 
-  if (claimed) {
+  // Flash screen
+  if (stage === 'flash') {
+    return <div className="min-h-screen bg-white flex items-center justify-center animate-flash" />
+  }
+
+  // Full reveal screen
+  if (stage === 'reveal') {
+    if (isCharacter && char) {
+      return (
+        <div className={`min-h-screen bg-gradient-to-b ${rarityBg[char.rarity]} flex flex-col items-center justify-center px-6 text-center`}>
+          <ConfettiOverlay intensity={char.rarity === 'legendary' ? 'heavy' : char.rarity === 'rare' ? 'heavy' : 'medium'} />
+
+          {/* Rarity badge */}
+          <p className={`text-xs font-black uppercase tracking-widest mb-4 ${rarityTextColor[char.rarity]}`}>
+            {rarityLabel[char.rarity]}
+          </p>
+
+          {/* Lumin */}
+          <div className="animate-pulse-glow mb-6">
+            <LuminSVG characterId={photo.pullResult} stage={0} size={160} animate happiness={80} />
+          </div>
+
+          {/* Name & info */}
+          <h1 className="text-white font-black text-5xl drop-shadow-lg">{char.evolutionNames[0]}</h1>
+          <p className="text-white/60 text-lg mt-1">{char.element} Lumin</p>
+          <p className="text-white/50 mt-1 italic text-sm">{char.description}</p>
+
+          {/* First message */}
+          <div className="mt-5 bg-white/10 rounded-2xl px-5 py-3 max-w-xs w-full">
+            <p className="text-white/80 italic text-sm">"{char.messages[0]}"</p>
+          </div>
+
+          <button
+            onClick={() => onNavigate('lumin')}
+            className="mt-8 bg-white text-gray-900 font-black text-xl px-12 py-4 rounded-3xl shadow-2xl active:scale-95 transition-transform"
+          >
+            Meet {char.evolutionNames[0]}! 🎉
+          </button>
+          <button onClick={() => onNavigate('home')} className="mt-3 text-white/50 text-sm font-semibold py-2">
+            Back Home
+          </button>
+        </div>
+      )
+    }
+
+    // Coins reveal (miss)
     return (
-      <div className={`min-h-screen flex flex-col items-center justify-center px-6 text-center ${isCharacter ? 'bg-gradient-to-b from-indigo-700 to-violet-900' : 'bg-gradient-to-b from-teal-600 to-emerald-700'}`}>
-        {isCharacter && <ConfettiOverlay intensity={char?.rarity === 'legendary' ? 'heavy' : 'medium'} />}
-
-        {isCharacter && char ? (
-          <>
-            <div className="animate-pulse-glow mb-4">
-              <LuminSVG characterId={photo.pullResult} stage={0} size={140} animate happiness={80} />
-            </div>
-            <p className={`text-xs font-black uppercase tracking-widest mb-1 ${rarityTextColor[char.rarity]}`}>
-              {char.rarity === 'legendary' ? '⚡ LEGENDARY' : char.rarity === 'rare' ? '💎 RARE' : char.rarity === 'uncommon' ? '🟢 UNCOMMON' : 'COMMON'}
-            </p>
-            <h1 className="text-white font-black text-4xl">{char.evolutionNames[0]}</h1>
-            <p className="text-indigo-200 mt-1">{char.element} Lumin • {char.description}</p>
-            <div className="mt-4 bg-white/10 rounded-2xl px-5 py-3 max-w-xs">
-              <p className="text-white/80 italic text-sm">"{char.messages[0]}"</p>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="text-6xl mb-4">🪙</div>
-            <h1 className="text-white font-black text-4xl">+{BALANCE.cleanRoomCoins} Coins!</h1>
-            <p className="text-emerald-200 mt-2 text-lg">Nice clean room — keep it up!</p>
-            <p className="text-emerald-300/70 mt-1 text-sm">No new Lumin today, but coins are still yours.</p>
-          </>
-        )}
-
+      <div className="min-h-screen bg-gradient-to-b from-teal-700 to-emerald-900 flex flex-col items-center justify-center px-6 text-center">
+        <div className="text-7xl mb-4 animate-bounce">🪙</div>
+        <h1 className="text-white font-black text-4xl drop-shadow">+{BALANCE.cleanRoomCoins} Coins!</h1>
+        <p className="text-teal-200 mt-3 text-lg font-semibold">Your room looks great!</p>
+        <p className="text-teal-300/60 mt-1 text-sm">No new Lumin this time — keep cleaning for another chance!</p>
         <button
-          onClick={() => isCharacter ? onNavigate('lumin') : onNavigate('home')}
-          className="mt-8 bg-white text-gray-900 font-black text-lg px-10 py-4 rounded-3xl shadow-xl active:scale-95 transition-transform"
+          onClick={() => onNavigate('home')}
+          className="mt-10 bg-white text-teal-700 font-black text-xl px-12 py-4 rounded-3xl shadow-xl active:scale-95 transition-transform"
         >
-          {isCharacter ? `Meet ${char?.evolutionNames[0]}! 🎉` : 'Back Home 🏠'}
+          Back Home 🏠
         </button>
       </div>
     )
   }
 
+  // Photo with shiny spot
   return (
-    <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-4">
-      <p className="text-white font-black text-xl mb-6 text-center">
-        ✨ Something's hiding in your room photo!
-      </p>
-
-      {/* Photo with shiny spot */}
-      <div className="relative w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl">
-        <img src={photo.photoDataUrl} alt="Your room" className="w-full aspect-video object-cover" />
-
-        {/* Shiny spot */}
-        <button
-          onClick={handleTap}
-          className="absolute"
-          style={{ left: `${pos.x}%`, top: `${pos.y}%`, transform: 'translate(-50%, -50%)' }}
-        >
-          <div className={`relative w-12 h-12 rounded-full flex items-center justify-center ${tapped ? 'scale-150 opacity-0' : ''} transition-all duration-500`}>
-            {/* Outer pulse ring */}
-            <div className={`absolute inset-0 rounded-full animate-ping opacity-60 ${isCharacter ? 'bg-blue-400' : 'bg-white'}`} />
-            {/* Inner glow */}
-            <div className={`absolute inset-1 rounded-full animate-pulse ${isCharacter ? 'bg-blue-300' : 'bg-gray-100'}`} />
-            {/* Core */}
-            <div className={`relative w-5 h-5 rounded-full ${isCharacter ? 'bg-blue-200' : 'bg-white'}`}
-              style={{ boxShadow: isCharacter ? '0 0 12px 4px rgba(147,197,253,0.8)' : '0 0 12px 4px rgba(255,255,255,0.8)' }}
-            />
-          </div>
+    <div className="min-h-screen bg-gray-950 flex flex-col">
+      <div className="bg-gray-900 px-4 pt-10 pb-4">
+        <button onClick={() => onNavigate('home')} className="bg-white/10 rounded-full p-2 inline-flex">
+          <ArrowLeft size={20} className="text-white" />
         </button>
       </div>
 
-      <p className={`mt-6 text-sm font-bold animate-bounce ${isCharacter ? 'text-blue-300' : 'text-gray-400'}`}>
-        Tap the {isCharacter ? 'blue' : 'white'} glow to reveal!
-      </p>
+      <div className="flex-1 flex flex-col items-center justify-center px-4 gap-6">
+        <p className="text-white font-black text-xl text-center">
+          ✨ Something's hiding in your clean room!
+        </p>
+
+        <div className="relative w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl">
+          <img src={photo.photoDataUrl} alt="Your room" className="w-full aspect-video object-cover" />
+          <button
+            onClick={handleShinyTap}
+            className="absolute"
+            style={{ left: `${pos.x}%`, top: `${pos.y}%`, transform: 'translate(-50%, -50%)' }}
+          >
+            <span className="relative flex w-14 h-14 items-center justify-center">
+              <span className={`absolute inset-0 rounded-full animate-ping opacity-50 ${isCharacter ? 'bg-blue-400' : 'bg-white'}`} />
+              <span className={`absolute inset-2 rounded-full animate-pulse ${isCharacter ? 'bg-blue-300' : 'bg-gray-100'}`} />
+              <span
+                className={`relative w-6 h-6 rounded-full ${isCharacter ? 'bg-blue-200' : 'bg-white'}`}
+                style={{ boxShadow: isCharacter ? '0 0 16px 6px rgba(147,197,253,0.9)' : '0 0 16px 6px rgba(255,255,255,0.9)' }}
+              />
+            </span>
+          </button>
+        </div>
+
+        <p className={`text-sm font-bold animate-bounce ${isCharacter ? 'text-blue-300' : 'text-gray-400'}`}>
+          Tap the {isCharacter ? 'blue' : 'white'} glow to reveal!
+        </p>
+      </div>
     </div>
   )
 }
+
+// ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function PhotoSubmitScreen({ onNavigate }) {
   const { submitPhoto, settings, unclaimedPhoto } = useAppState()
@@ -110,7 +157,6 @@ export default function PhotoSubmitScreen({ onNavigate }) {
   const [submitted, setSubmitted] = useState(false)
   const fileRef = useRef(null)
 
-  // If there's an approved unclaimed photo, show the result screen
   if (unclaimedPhoto) {
     return <PhotoResultScreen photo={unclaimedPhoto} onNavigate={onNavigate} />
   }
@@ -128,8 +174,7 @@ export default function PhotoSubmitScreen({ onNavigate }) {
 
   const handleSubmit = () => {
     if (!preview) return
-    const ok = submitPhoto(preview)
-    if (ok) setSubmitted(true)
+    if (submitPhoto(preview)) setSubmitted(true)
   }
 
   if (submitted) {
@@ -138,7 +183,7 @@ export default function PhotoSubmitScreen({ onNavigate }) {
         <div className="text-6xl mb-4 animate-bounce">📸</div>
         <h1 className="text-white font-black text-3xl drop-shadow">Photo submitted!</h1>
         <p className="text-pink-100 mt-2 text-lg">Your parent will review it soon.</p>
-        <p className="text-pink-200 mt-1 text-sm">Check back here to see if you found something!</p>
+        <p className="text-pink-200 mt-1 text-sm">Check back here to see what you found!</p>
         <button onClick={() => onNavigate('home')} className="mt-8 bg-white text-pink-600 font-black text-lg px-10 py-4 rounded-3xl shadow-xl active:scale-95 transition-transform">
           Back Home 🏠
         </button>
@@ -153,7 +198,7 @@ export default function PhotoSubmitScreen({ onNavigate }) {
         <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
           <div className="text-5xl mb-4">⏰</div>
           <h2 className="text-xl font-black text-gray-700">Already submitted today!</h2>
-          <p className="text-gray-400 mt-2">Come back tomorrow to submit another photo.</p>
+          <p className="text-gray-400 mt-2">Come back tomorrow for another chance.</p>
           <button onClick={() => onNavigate('home')} className="mt-6 text-purple-500 font-bold">← Back Home</button>
         </div>
       </div>
@@ -210,10 +255,3 @@ const Header = ({ onBack }) => (
     </div>
   </div>
 )
-
-const rarityTextColor = {
-  common: 'text-gray-300',
-  uncommon: 'text-green-400',
-  rare: 'text-blue-300',
-  legendary: 'text-yellow-300',
-}

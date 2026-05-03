@@ -9,8 +9,8 @@ import CoinDisplay from '../shared/CoinDisplay'
 import { ArrowLeft, Edit2, Check } from 'lucide-react'
 
 export default function LuminRewardsScreen({ onNavigate }) {
-  const { kid, characters, activeCharacterId, activeCharacter, setActiveCharacter, renameCharacter, buyItem } = useAppState()
-  const [tab, setTab] = useState('companion') // 'companion' | 'collection' | 'shop'
+  const { kid, characters, activeCharacterId, activeCharacter, setActiveCharacter, renameCharacter, buyItem, customRewards, redeemCustomReward, rewardRedemptions } = useAppState()
+  const [tab, setTab] = useState('companion') // 'companion' | 'collection' | 'shop' | 'rewards'
   const [editing, setEditing] = useState(false)
   const [nameInput, setNameInput] = useState('')
   const [buyFeedback, setBuyFeedback] = useState(null)
@@ -47,11 +47,11 @@ export default function LuminRewardsScreen({ onNavigate }) {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2">
-          {['companion', 'collection', 'shop'].map(t => (
+        <div className="flex gap-1">
+          {['companion', 'collection', 'shop', 'rewards'].map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className={`flex-1 py-2 rounded-full text-sm font-bold capitalize transition-colors ${tab === t ? 'bg-white text-purple-600' : 'bg-white/20 text-white'}`}>
-              {t === 'companion' ? '🐾 Active' : t === 'collection' ? '📚 Collection' : '🛒 Shop'}
+              className={`flex-1 py-2 rounded-full text-xs font-bold transition-colors ${tab === t ? 'bg-white text-purple-600' : 'bg-white/20 text-white'}`}>
+              {t === 'companion' ? '🐾' : t === 'collection' ? '📚' : t === 'shop' ? '🛒' : '🎁'}
             </button>
           ))}
         </div>
@@ -153,9 +153,7 @@ export default function LuminRewardsScreen({ onNavigate }) {
                         <div className="text-3xl mb-1">{item.emoji}</div>
                         <p className="font-bold text-gray-800 text-sm">{item.name}</p>
                         <p className="text-xs text-green-600 font-semibold">+{item.happinessBoost} 😄</p>
-                        <div className="flex items-center gap-1 mt-2 text-amber-600 font-bold text-sm">
-                          🪙 {item.cost}
-                        </div>
+                        <div className="flex items-center gap-1 mt-2 text-amber-600 font-bold text-sm">🪙 {item.cost}</div>
                         {justBought && <p className="text-green-500 text-xs font-bold mt-1">Bought! 🎉</p>}
                       </button>
                     )
@@ -163,6 +161,45 @@ export default function LuminRewardsScreen({ onNavigate }) {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {tab === 'rewards' && (
+          <div className="px-4 py-6 space-y-4">
+            <p className="text-sm text-gray-500 font-semibold">Real rewards set by your parent 🎁</p>
+
+            {customRewards.length === 0 ? (
+              <div className="text-center py-12 text-gray-300">
+                <p className="text-4xl mb-2">🎁</p>
+                <p className="font-bold text-gray-400">No rewards yet</p>
+                <p className="text-sm text-gray-400">Ask your parent to add some!</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {customRewards.map(reward => {
+                  const canAfford = (kid?.coins ?? 0) >= reward.coinCost
+                  const pendingCount = rewardRedemptions.filter(r => r.rewardId === reward.id && r.status === 'pending').length
+                  return (
+                    <div key={reward.id} className={`bg-white rounded-2xl p-4 shadow-sm flex items-center gap-4 ${!canAfford ? 'opacity-50' : ''}`}>
+                      <span className="text-4xl flex-shrink-0">{reward.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-black text-gray-800">{reward.name}</p>
+                        <p className="text-sm text-gray-500">{reward.description}</p>
+                        <div className="flex items-center gap-1 mt-1 text-amber-600 font-bold text-sm">🪙 {reward.coinCost}</div>
+                        {pendingCount > 0 && <p className="text-xs text-yellow-600 font-bold mt-1">⏳ {pendingCount} pending</p>}
+                      </div>
+                      <button
+                        onClick={() => redeemCustomReward(reward.id)}
+                        disabled={!canAfford}
+                        className="flex-shrink-0 bg-gradient-to-r from-purple-600 to-violet-500 text-white font-black text-sm px-4 py-2 rounded-xl disabled:opacity-40 active:scale-95 transition-transform"
+                      >
+                        Buy
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
