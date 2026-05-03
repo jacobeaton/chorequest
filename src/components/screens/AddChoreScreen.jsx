@@ -22,17 +22,21 @@ const autoDifficulty = (minutes) => {
   return 'hard'
 }
 
-export default function AddChoreScreen({ onNavigate, createdBy = 'kid' }) {
-  const { addChore } = useAppState()
+export default function AddChoreScreen({ onNavigate, createdBy = 'kid', existingChore = null }) {
+  const { addChore, updateChore } = useAppState()
   const { kids } = useAuth()
-  const [name, setName] = useState('')
-  const [emoji, setEmoji] = useState('🧹')
-  const [minutes, setMinutes] = useState(10)
-  const [difficulty, setDifficulty] = useState('medium')
-  const [points, setPoints] = useState(BALANCE.xp.medium)
-  const [coins, setCoins] = useState(BALANCE.coins.medium)
-  // All kids selected by default
-  const [selectedKidIds, setSelectedKidIds] = useState(() => kids.map(k => k.id))
+  const isEditing = !!existingChore
+  const [name, setName] = useState(existingChore?.name ?? '')
+  const [emoji, setEmoji] = useState(existingChore?.emoji ?? '🧹')
+  const [minutes, setMinutes] = useState(existingChore?.estimatedMinutes ?? 10)
+  const [difficulty, setDifficulty] = useState(existingChore?.difficulty ?? 'medium')
+  const [points, setPoints] = useState(existingChore?.points ?? BALANCE.xp.medium)
+  const [coins, setCoins] = useState(existingChore?.coins ?? BALANCE.coins.medium)
+  // Pre-fill assignment: null = all kids, specific id = just that kid
+  const [selectedKidIds, setSelectedKidIds] = useState(() => {
+    if (existingChore?.assignedKidId) return [existingChore.assignedKidId]
+    return kids.map(k => k.id)
+  })
 
   // Keep selection in sync if kids load after mount
   const allKidIds = useMemo(() => kids.map(k => k.id), [kids])
@@ -61,7 +65,11 @@ export default function AddChoreScreen({ onNavigate, createdBy = 'kid' }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!name.trim()) return
-    addChore({ name: name.trim(), emoji, estimatedMinutes: minutes, points, coins, difficulty, createdBy, assignedKidId })
+    if (isEditing) {
+      updateChore(existingChore.id, { name: name.trim(), emoji, estimatedMinutes: minutes, points, coins, difficulty, assignedKidId })
+    } else {
+      addChore({ name: name.trim(), emoji, estimatedMinutes: minutes, points, coins, difficulty, createdBy, assignedKidId })
+    }
     onNavigate(createdBy === 'parent' ? 'home' : 'chores')
   }
 
@@ -69,10 +77,10 @@ export default function AddChoreScreen({ onNavigate, createdBy = 'kid' }) {
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <div className="bg-gradient-to-r from-violet-600 to-purple-500 px-4 pt-10 pb-5 rounded-b-[2rem] shadow-md">
         <div className="flex items-center gap-3">
-          <button onClick={() => onNavigate('chores')} className="bg-white/20 rounded-full p-2">
+          <button onClick={() => onNavigate(createdBy === 'parent' ? 'home' : 'chores')} className="bg-white/20 rounded-full p-2">
             <ArrowLeft size={20} className="text-white" />
           </button>
-          <h1 className="text-white font-black text-2xl">Add Chore</h1>
+          <h1 className="text-white font-black text-2xl">{isEditing ? 'Edit Chore' : 'Add Chore'}</h1>
         </div>
       </div>
 
@@ -197,7 +205,7 @@ export default function AddChoreScreen({ onNavigate, createdBy = 'kid' }) {
           disabled={!name.trim()}
           className="w-full bg-gradient-to-r from-purple-600 to-violet-500 text-white font-black text-xl py-4 rounded-3xl disabled:opacity-40 active:scale-95 transition-transform shadow-lg"
         >
-          Add Chore ✅
+          {isEditing ? 'Save Changes ✅' : 'Add Chore ✅'}
         </button>
       </form>
     </div>

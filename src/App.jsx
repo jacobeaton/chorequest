@@ -45,7 +45,7 @@ function Router() {
   // Parent device: dashboard, but allow sub-screens like Add Chore
   if (deviceKidId === 'parent') {
     const parentScreen = view === 'add'
-      ? <AddChoreScreen onNavigate={navigate} createdBy={params.createdBy ?? 'parent'} />
+      ? <AddChoreScreen onNavigate={navigate} createdBy={params.createdBy ?? 'parent'} existingChore={params.existingChore ?? null} />
       : <ParentDashboard key={dashRefreshKey} onNavigate={navigate} />
     return (
       <div className="max-w-md mx-auto min-h-screen relative overflow-hidden font-display">
@@ -64,7 +64,7 @@ function Router() {
     chores: <ChoreListScreen onNavigate={navigate} filter={params.filter ?? 'all'} />,
     active: params.chore ? <ActiveChoreScreen chore={params.chore} onNavigate={navigate} /> : <HomeScreen onNavigate={navigate} />,
     complete: <ChoreCompleteScreen chore={params.chore} result={params.result} onNavigate={navigate} />,
-    add: <AddChoreScreen onNavigate={navigate} createdBy={params.createdBy ?? 'kid'} />,
+    add: <AddChoreScreen onNavigate={navigate} createdBy={params.createdBy ?? 'kid'} existingChore={params.existingChore ?? null} />,
     lumin: <LuminRewardsScreen onNavigate={navigate} />,
     parent: <ParentModeScreen onNavigate={navigate} />,
     evolve: <EvolutionRevealScreen characterId={params.characterId} newStage={params.newStage} newLevel={params.newLevel} onNavigate={navigate} />,

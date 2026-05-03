@@ -351,6 +351,9 @@ export default function ParentDashboard({ onNavigate }) {
                   <p className="font-bold text-gray-800">{chore.name}</p>
                   <p className="text-xs text-gray-400">{chore.difficulty} · {chore.estimatedMinutes}min · ⚡{chore.points} · 🪙{chore.coins}</p>
                 </div>
+                <button onClick={() => onNavigate('add', { createdBy: 'parent', existingChore: chore })} className="text-purple-400 p-1">
+                  <Edit2 size={16} />
+                </button>
                 <button onClick={() => handleDeleteChore(chore.id)} className="text-red-400 p-1">
                   <Trash2 size={16} />
                 </button>
