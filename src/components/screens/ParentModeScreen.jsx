@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import { useAppState } from '../../hooks/useAppState'
+import { useAuth } from '../../hooks/useAuth'
 import { CHARACTERS } from '../../config/characters'
 import { storage } from '../../utils/storage'
+import { supabase } from '../../lib/supabase'
 import { ArrowLeft, Lock, Trash2, Edit2, CheckCircle, XCircle, Star, Hourglass } from 'lucide-react'
 
 const REWARD_EMOJIS = ['🎮','🍕','🎬','🏖️','🛍️','🎢','💰','🎁','⭐','🚀','🏆','🎪','🎯','🎲','📱','🍦','🎠','🎡','🛒','💵']
 
 export default function ParentModeScreen({ onNavigate }) {
   const { settings, updateSettings, chores, deleteChore, completions, photoQueue, approvePhoto, rejectPhoto, pendingCompletions, approveCompletion, rejectCompletion, pendingChoreCount, customRewards, addCustomReward, deleteCustomReward, rewardRedemptions, fulfillRedemption, rejectRedemption, pendingRedemptionCount } = useAppState()
+  const { kids, deviceKidId, setDeviceLock } = useAuth()
   const [pin, setPin] = useState('')
   const [unlocked, setUnlocked] = useState(false)
   const [pinError, setPinError] = useState(false)
@@ -339,6 +342,28 @@ export default function ParentModeScreen({ onNavigate }) {
               </button>
             </div>
 
+            <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+              <h3 className="font-black text-gray-700">Switch Device</h3>
+              <p className="text-xs text-gray-400">Change which profile this device is locked to.</p>
+              <div className="space-y-2">
+                {kids.map(k => (
+                  <button
+                    key={k.id}
+                    onClick={() => { setDeviceLock(k.id); onNavigate('home') }}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-sm font-bold transition-colors ${k.id === deviceKidId ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700 active:bg-gray-200'}`}
+                  >
+                    {k.id === deviceKidId ? '✓ ' : ''}{k.name}'s device
+                  </button>
+                ))}
+                <button
+                  onClick={() => { setDeviceLock('parent'); onNavigate('home') }}
+                  className={`w-full text-left px-3 py-2 rounded-xl text-sm font-bold transition-colors ${deviceKidId === 'parent' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700 active:bg-gray-200'}`}
+                >
+                  {deviceKidId === 'parent' ? '✓ ' : ''}Parent device
+                </button>
+              </div>
+            </div>
+
             <WipeDataButton onNavigate={onNavigate} />
           </div>
         )}
@@ -350,8 +375,9 @@ export default function ParentModeScreen({ onNavigate }) {
 function WipeDataButton() {
   const [confirm, setConfirm] = useState(false)
 
-  const handleWipe = () => {
+  const handleWipe = async () => {
     storage.clearAll()
+    await supabase.auth.signOut()
     window.location.reload()
   }
 

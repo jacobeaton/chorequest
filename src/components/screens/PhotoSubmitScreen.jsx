@@ -180,9 +180,10 @@ export default function PhotoSubmitScreen({ onNavigate }) {
     reader.readAsDataURL(file)
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!preview) return
-    if (submitPhoto(preview)) setSubmitted(true)
+    const success = await submitPhoto(preview)
+    if (success) setSubmitted(true)
   }
 
   if (submitted) {
