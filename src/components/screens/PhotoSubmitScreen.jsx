@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { localToday } from '../../utils/dateUtils'
 import { useAppState } from '../../hooks/useAppState'
 import { CHARACTERS } from '../../config/characters'
 import { BALANCE } from '../../config/balance'
@@ -169,7 +170,7 @@ export default function PhotoSubmitScreen({ onNavigate }) {
     return <PhotoResultScreen photo={unclaimedPhoto} onNavigate={onNavigate} />
   }
 
-  const today = new Date().toISOString().split('T')[0]
+  const today = localToday()
   const alreadySubmitted = settings.lastPhotoSubmissionDate === today
 
   const handleFile = (e) => {

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import * as db from '../lib/db'
+import { localToday } from '../utils/dateUtils'
 
 const DEVICE_KID_KEY = 'cq_device_kid_id'
 
@@ -82,7 +83,7 @@ export const AuthProvider = ({ children }) => {
       xp: 0,
       evolutionStage: 0,
       happiness: 80,
-      lastInteractionDate: new Date().toISOString().split('T')[0],
+      lastInteractionDate: localToday(),
       nickname: null,
     })
     await db.updateKid(kid.id, { activeCharacterId: starterId })

@@ -3,6 +3,7 @@ import { CHARACTERS } from '../../config/characters'
 import LuminSVG from '../lumins/LuminSVG'
 import XPBar from '../shared/XPBar'
 import HappinessBar from '../shared/HappinessBar'
+import { localToday } from '../../utils/dateUtils'
 import CoinDisplay from '../shared/CoinDisplay'
 import ChoreCard from '../shared/ChoreCard'
 import { Settings, Camera, Star, CheckCircle } from 'lucide-react'
@@ -19,7 +20,7 @@ export default function HomeScreen({ onNavigate }) {
   if (!char || !activeCharacter) return null
 
   const displayName = activeCharacter.nickname ?? char.evolutionNames[activeCharacter.evolutionStage]
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = localToday()
   const todayChores = chores.slice(0, 3)
 
   return (

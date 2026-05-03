@@ -7,9 +7,10 @@ import { BALANCE } from '../../config/balance'
 import * as db from '../../lib/db'
 import LuminSVG from '../lumins/LuminSVG'
 import { ArrowLeft, LogOut, Trash2, CheckCircle, XCircle, Hourglass, Edit2, Monitor, Lock, UserPlus } from 'lucide-react'
+import { localToday, localDateOf } from '../../utils/dateUtils'
 
 const REWARD_EMOJIS = ['🎮','🍕','🎬','🏖️','🛍️','🎢','💰','🎁','⭐','🚀','🏆','🎪','🎯','🎲','📱','🍦','🎠','🎡','🛒','💵']
-const today = () => new Date().toISOString().split('T')[0]
+const today = localToday
 
 export default function ParentDashboard({ onNavigate }) {
   const { signOut, clearDeviceLock, setDeviceLock, kids, parentSettings, updateParentSettings, createKid } = useAuth()
@@ -85,7 +86,7 @@ export default function ParentDashboard({ onNavigate }) {
     const last = kidRow.lastCompletionDate
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
-    const yStr = yesterday.toISOString().split('T')[0]
+    const yStr = localDateOf(yesterday)
     const newStreak = last === t ? kidRow.currentStreak : last === yStr ? kidRow.currentStreak + 1 : 1
 
     await Promise.all([

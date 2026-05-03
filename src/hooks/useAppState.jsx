@@ -9,6 +9,7 @@ import { BALANCE, SHOP_ITEMS } from '../config/balance'
 import { CHARACTERS } from '../config/characters'
 import { useAuth } from './useAuth'
 import * as db from '../lib/db'
+import { localToday, localDateOf } from '../utils/dateUtils'
 
 const AppContext = createContext(null)
 
@@ -18,11 +19,11 @@ const makeCharacterEntry = (id) => ({
   xp: 0,
   evolutionStage: 0,
   happiness: 80,
-  lastInteractionDate: new Date().toISOString().split('T')[0],
+  lastInteractionDate: localToday(),
   nickname: null,
 })
 
-const today = () => new Date().toISOString().split('T')[0]
+const today = localToday
 
 export const AppProvider = ({ children }) => {
   const { deviceKidId, parentSettings, session, updateParentSettings, refreshKids } = useAuth()
@@ -151,7 +152,7 @@ export const AppProvider = ({ children }) => {
 
   const lockedChoreIds = new Set(
     pendingCompletions
-      .filter(p => p.submittedAt?.startsWith(today()) && p.status !== 'rejected')
+      .filter(p => p.submittedAt && localDateOf(p.submittedAt) === today() && p.status !== 'rejected')
       .map(p => p.choreId)
   )
 
@@ -211,7 +212,7 @@ export const AppProvider = ({ children }) => {
       if (!last) return false
       const yesterday = new Date()
       yesterday.setDate(yesterday.getDate() - 1)
-      return streaks.currentStreak >= BALANCE.streakThresholdDays - 1 && last === yesterday.toISOString().split('T')[0]
+      return streaks.currentStreak >= BALANCE.streakThresholdDays - 1 && last === localDateOf(yesterday)
     })()
 
     const char = characters.find(c => c.id === activeCharacterId)
@@ -265,7 +266,7 @@ export const AppProvider = ({ children }) => {
     const last = streaks.lastCompletionDate
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
-    const yStr = yesterday.toISOString().split('T')[0]
+    const yStr = localDateOf(yesterday)
     const newStreak = last === t ? streaks.currentStreak : last === yStr ? streaks.currentStreak + 1 : 1
 
     setCharactersState(prev => prev.map(c => c.id === pending.characterId ? updated : c))

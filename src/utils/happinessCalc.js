@@ -1,4 +1,5 @@
 import { BALANCE } from '../config/balance'
+import { localToday } from './dateUtils'
 
 const daysBetween = (dateA, dateB) => {
   const msPerDay = 1000 * 60 * 60 * 24
@@ -6,7 +7,7 @@ const daysBetween = (dateA, dateB) => {
 }
 
 export const applyHappinessDecay = (characters) => {
-  const today = new Date().toISOString().split('T')[0]
+  const today = localToday()
   return characters.map(char => {
     if (!char.lastInteractionDate) return char
     const days = daysBetween(today, char.lastInteractionDate)
