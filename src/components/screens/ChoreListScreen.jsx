@@ -1,4 +1,5 @@
 import { useAppState } from '../../hooks/useAppState'
+import { useAuth } from '../../hooks/useAuth'
 import ChoreCard from '../shared/ChoreCard'
 import { ArrowLeft, Plus } from 'lucide-react'
 
@@ -6,6 +7,12 @@ const FILTERS = ['all', 'easy', 'medium', 'hard']
 
 export default function ChoreListScreen({ onNavigate, filter: filterProp = 'all' }) {
   const { chores, lockedChoreIds, pendingCompletions } = useAppState()
+  const { deviceKidId } = useAuth()
+
+  // Only show chores available to this kid (unassigned or assigned to them)
+  const visibleChores = chores.filter(c =>
+    !c.assignedKidId || c.assignedKidId === deviceKidId
+  )
 
   const getStatus = (choreId) => {
     if (!lockedChoreIds.has(choreId)) return null
@@ -29,7 +36,7 @@ export default function ChoreListScreen({ onNavigate, filter: filterProp = 'all'
       </div>
 
       <div className="flex-1 px-4 py-4 space-y-2 overflow-y-auto pb-8">
-        {chores
+        {visibleChores
           .filter(c => filterProp === 'all' || c.difficulty === filterProp)
           .map(chore => (
             <ChoreCard
@@ -39,7 +46,7 @@ export default function ChoreListScreen({ onNavigate, filter: filterProp = 'all'
               status={getStatus(chore.id)}
             />
           ))}
-        {chores.length === 0 && (
+        {visibleChores.length === 0 && (
           <div className="text-center py-16 text-gray-400">
             <p className="text-4xl mb-2">📋</p>
             <p className="font-bold">No chores yet!</p>

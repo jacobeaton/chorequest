@@ -86,7 +86,11 @@ export const AuthProvider = ({ children }) => {
       nickname: null,
     })
     await db.updateKid(kid.id, { activeCharacterId: starterId })
-    await db.seedDefaultChores(session.user.id)
+    // Only seed default chores if this is the first kid (no chores exist yet)
+    const existingChores = await db.getChores()
+    if (existingChores.length === 0) {
+      await db.seedDefaultChores(session.user.id)
+    }
     const updatedKid = { ...kid, activeCharacterId: starterId }
     setKids(prev => [...prev, updatedKid])
     return updatedKid

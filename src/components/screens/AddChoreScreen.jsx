@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useAppState } from '../../hooks/useAppState'
+import { useAuth } from '../../hooks/useAuth'
 import { ArrowLeft } from 'lucide-react'
 import { BALANCE } from '../../config/balance'
 
@@ -23,12 +24,24 @@ const autoDifficulty = (minutes) => {
 
 export default function AddChoreScreen({ onNavigate, createdBy = 'kid' }) {
   const { addChore } = useAppState()
+  const { kids } = useAuth()
   const [name, setName] = useState('')
   const [emoji, setEmoji] = useState('🧹')
   const [minutes, setMinutes] = useState(10)
   const [difficulty, setDifficulty] = useState('medium')
   const [points, setPoints] = useState(BALANCE.xp.medium)
   const [coins, setCoins] = useState(BALANCE.coins.medium)
+  // All kids selected by default
+  const [selectedKidIds, setSelectedKidIds] = useState(() => kids.map(k => k.id))
+
+  // Keep selection in sync if kids load after mount
+  const allKidIds = useMemo(() => kids.map(k => k.id), [kids])
+
+  const toggleKid = (id) => {
+    setSelectedKidIds(prev =>
+      prev.includes(id) ? prev.filter(k => k !== id) : [...prev, id]
+    )
+  }
 
   const handleMinutesChange = (val) => {
     setMinutes(val)
@@ -37,11 +50,19 @@ export default function AddChoreScreen({ onNavigate, createdBy = 'kid' }) {
     setCoins(autoCoins(val))
   }
 
+  // Derive assignedKidId from selection:
+  // all selected → null (any kid), exactly one → that kid's id, none → null
+  const assignedKidId = useMemo(() => {
+    if (selectedKidIds.length === 0 || selectedKidIds.length === allKidIds.length) return null
+    if (selectedKidIds.length === 1) return selectedKidIds[0]
+    return null // partial multi-select falls back to all
+  }, [selectedKidIds, allKidIds])
+
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!name.trim()) return
-    addChore({ name: name.trim(), emoji, estimatedMinutes: minutes, points, coins, difficulty, createdBy })
-    onNavigate('chores')
+    addChore({ name: name.trim(), emoji, estimatedMinutes: minutes, points, coins, difficulty, createdBy, assignedKidId })
+    onNavigate(createdBy === 'parent' ? 'home' : 'chores')
   }
 
   return (
@@ -120,6 +141,44 @@ export default function AddChoreScreen({ onNavigate, createdBy = 'kid' }) {
             ))}
           </div>
         </div>
+
+        {/* Kid assignment — only shown for parent chores when there are multiple kids */}
+        {createdBy === 'parent' && kids.length > 0 && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-bold text-gray-600">Assign To</label>
+              <button
+                type="button"
+                onClick={() => setSelectedKidIds(selectedKidIds.length > 0 ? [] : allKidIds)}
+                className="text-xs font-bold text-purple-500"
+              >
+                {selectedKidIds.length > 0 ? 'Deselect all' : 'Select all'}
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {kids.map(k => {
+                const checked = selectedKidIds.includes(k.id)
+                return (
+                  <button
+                    key={k.id}
+                    type="button"
+                    onClick={() => toggleKid(k.id)}
+                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors border-2 ${
+                      checked
+                        ? 'bg-purple-100 border-purple-400 text-purple-700'
+                        : 'bg-gray-50 border-gray-200 text-gray-400'
+                    }`}
+                  >
+                    {checked ? '✓ ' : ''}{k.name}
+                  </button>
+                )
+              })}
+            </div>
+            {selectedKidIds.length === 0 && (
+              <p className="text-xs text-amber-500 font-semibold">No kids selected — chore won't appear for anyone.</p>
+            )}
+          </div>
+        )}
 
         {/* Rewards preview */}
         <div className="bg-purple-50 rounded-2xl p-4 border border-purple-100 flex justify-around">

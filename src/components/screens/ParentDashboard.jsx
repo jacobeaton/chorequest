@@ -1,17 +1,18 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../../hooks/useAuth'
-import { CHARACTERS } from '../../config/characters'
+import { CHARACTERS, STARTERS } from '../../config/characters'
 import { attemptPull } from '../../utils/pullSystem'
 import { applyXpToCharacter, calcXpEarned, calcCoinsEarned, getAccountLevel } from '../../utils/xpCalc'
 import { BALANCE } from '../../config/balance'
 import * as db from '../../lib/db'
-import { ArrowLeft, LogOut, Trash2, CheckCircle, XCircle, Hourglass, Edit2, Monitor, Lock } from 'lucide-react'
+import LuminSVG from '../lumins/LuminSVG'
+import { ArrowLeft, LogOut, Trash2, CheckCircle, XCircle, Hourglass, Edit2, Monitor, Lock, UserPlus } from 'lucide-react'
 
 const REWARD_EMOJIS = ['🎮','🍕','🎬','🏖️','🛍️','🎢','💰','🎁','⭐','🚀','🏆','🎪','🎯','🎲','📱','🍦','🎠','🎡','🛒','💵']
 const today = () => new Date().toISOString().split('T')[0]
 
 export default function ParentDashboard({ onNavigate }) {
-  const { signOut, clearDeviceLock, setDeviceLock, kids, parentSettings, updateParentSettings } = useAuth()
+  const { signOut, clearDeviceLock, setDeviceLock, kids, parentSettings, updateParentSettings, createKid } = useAuth()
   const [tab, setTab] = useState('queue')
   const [pendingCompletions, setPendingCompletions] = useState([])
   const [pendingPhotos, setPendingPhotos] = useState([])
@@ -24,6 +25,10 @@ export default function ParentDashboard({ onNavigate }) {
   const [changingPin, setChangingPin] = useState(false)
   const [newPin, setNewPin] = useState('')
   const [loading, setLoading] = useState(true)
+  const [addingKid, setAddingKid] = useState(false)
+  const [newKidName, setNewKidName] = useState('')
+  const [newKidStarter, setNewKidStarter] = useState(null)
+  const [addKidLoading, setAddKidLoading] = useState(false)
 
   const loadData = useCallback(async () => {
     const [pending, photos, choresData, rewards, redemptions] = await Promise.all([
@@ -154,6 +159,21 @@ export default function ParentDashboard({ onNavigate }) {
     setCustomRewards(prev => [...prev, created])
     setNewReward({ name: '', emoji: '🎁', description: '', coinCost: 100 })
     setAddingReward(false)
+  }
+
+  const handleAddKid = async () => {
+    if (!newKidName.trim() || !newKidStarter) return
+    setAddKidLoading(true)
+    try {
+      await createKid(newKidName.trim(), newKidStarter)
+      setNewKidName('')
+      setNewKidStarter(null)
+      setAddingKid(false)
+    } catch (err) {
+      console.error('addKid error:', err)
+    } finally {
+      setAddKidLoading(false)
+    }
   }
 
   const handleDeleteReward = async (id) => {
@@ -447,8 +467,48 @@ export default function ParentDashboard({ onNavigate }) {
               </button>
             </div>
 
-            <div className="bg-white rounded-2xl p-4 shadow-sm">
-              <h3 className="font-black text-gray-700 mb-1">Kids</h3>
+            <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-gray-700">Kids</h3>
+                <button onClick={() => setAddingKid(a => !a)} className="flex items-center gap-1 text-purple-600 font-bold text-sm">
+                  <UserPlus size={14} /> {addingKid ? 'Cancel' : 'Add Kid'}
+                </button>
+              </div>
+
+              {addingKid && (
+                <div className="space-y-3 pt-1">
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Kid's name"
+                    value={newKidName}
+                    onChange={e => setNewKidName(e.target.value)}
+                    maxLength={20}
+                    className="w-full border-2 border-purple-100 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none focus:border-purple-400 text-sm"
+                  />
+                  <p className="text-xs text-gray-500 font-semibold">Choose starter Lumin:</p>
+                  <div className="flex gap-2">
+                    {STARTERS.map(id => (
+                      <button
+                        key={id}
+                        onClick={() => setNewKidStarter(id)}
+                        className={`flex-1 flex flex-col items-center gap-1 p-2 rounded-xl border-2 transition-colors ${newKidStarter === id ? 'border-purple-400 bg-purple-50' : 'border-gray-100 bg-gray-50'}`}
+                      >
+                        <LuminSVG characterId={id} stage={0} size={40} animate={false} happiness={80} />
+                        <p className="text-xs font-bold text-gray-600">{CHARACTERS[id].evolutionNames[0]}</p>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={handleAddKid}
+                    disabled={!newKidName.trim() || !newKidStarter || addKidLoading}
+                    className="w-full bg-purple-600 text-white font-black py-2 rounded-xl disabled:opacity-40 active:scale-95 transition-transform text-sm"
+                  >
+                    {addKidLoading ? 'Creating...' : 'Create Profile'}
+                  </button>
+                </div>
+              )}
+
               {kids.map(k => (
                 <div key={k.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
                   <div>
