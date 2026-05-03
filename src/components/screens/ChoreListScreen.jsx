@@ -5,8 +5,13 @@ import { ArrowLeft, Plus } from 'lucide-react'
 const FILTERS = ['all', 'easy', 'medium', 'hard']
 
 export default function ChoreListScreen({ onNavigate, filter: filterProp = 'all' }) {
-  const { chores } = useAppState()
-  const [filter, setFilter] = [filterProp, () => {}]
+  const { chores, lockedChoreIds, pendingCompletions } = useAppState()
+
+  const getStatus = (choreId) => {
+    if (!lockedChoreIds.has(choreId)) return null
+    const p = pendingCompletions.find(p => p.choreId === choreId && p.status !== 'rejected')
+    return p?.status ?? null
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -31,6 +36,7 @@ export default function ChoreListScreen({ onNavigate, filter: filterProp = 'all'
               key={chore.id}
               chore={chore}
               onStart={() => onNavigate('active', { chore })}
+              status={getStatus(chore.id)}
             />
           ))}
         {chores.length === 0 && (

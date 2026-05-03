@@ -20,6 +20,8 @@ const makeCharacterEntry = (id) => ({
   nickname: null,
 })
 
+const today = () => new Date().toISOString().split('T')[0]
+
 export const AppProvider = ({ children }) => {
   const [kid, setKidState] = useState(() => storage.getKid())
   const [characters, setCharactersState] = useState(() => applyHappinessDecay(storage.getCharacters()))
@@ -29,17 +31,20 @@ export const AppProvider = ({ children }) => {
     return stored.length ? stored : SEED_CHORES
   })
   const [completions, setCompletionsState] = useState(() => storage.getCompletions())
+  const [pendingCompletions, setPendingCompletionsState] = useState(() => storage.getPendingCompletions())
+  const [recentApprovals, setRecentApprovalsState] = useState(() => storage.getRecentApprovals())
   const [streaks, setStreaksState] = useState(() => storage.getStreaks())
   const [photoQueue, setPhotoQueueState] = useState(() => storage.getPhotoQueue())
   const [settings, setSettingsState] = useState(() => storage.getSettings())
   const [purchaseHistory, setPurchaseHistoryState] = useState(() => storage.getPurchaseHistory())
 
-  // Persist on change
   useEffect(() => { storage.setKid(kid) }, [kid])
   useEffect(() => { storage.setCharacters(characters) }, [characters])
   useEffect(() => { storage.setActiveCharacter(activeCharacterId) }, [activeCharacterId])
   useEffect(() => { storage.setChores(chores) }, [chores])
   useEffect(() => { storage.setCompletions(completions) }, [completions])
+  useEffect(() => { storage.setPendingCompletions(pendingCompletions) }, [pendingCompletions])
+  useEffect(() => { storage.setRecentApprovals(recentApprovals) }, [recentApprovals])
   useEffect(() => { storage.setStreaks(streaks) }, [streaks])
   useEffect(() => { storage.setPhotoQueue(photoQueue) }, [photoQueue])
   useEffect(() => { storage.setSettings(settings) }, [settings])
@@ -47,13 +52,18 @@ export const AppProvider = ({ children }) => {
 
   const activeCharacter = characters.find(c => c.id === activeCharacterId) ?? null
 
+  // Chore IDs locked today (pending or approved — rejected allows retry)
+  const lockedChoreIds = new Set(
+    pendingCompletions
+      .filter(p => p.submittedAt.startsWith(today()) && p.status !== 'rejected')
+      .map(p => p.choreId)
+  )
+
   // ─── Setup ────────────────────────────────────────────────────────────────
 
   const setupKid = useCallback((name, starterId) => {
-    const newKid = { name, totalXpEarned: 0, coins: 0, accountLevel: 0 }
-    const startChar = makeCharacterEntry(starterId)
-    setKidState(newKid)
-    setCharactersState([startChar])
+    setKidState({ name, totalXpEarned: 0, coins: 0, accountLevel: 0 })
+    setCharactersState([makeCharacterEntry(starterId)])
     setActiveCharacterIdState(starterId)
     setSettingsState(s => ({ ...s, isFirstRun: false }))
     if (!storage.getChores().length) setChoresState(SEED_CHORES)
@@ -73,13 +83,13 @@ export const AppProvider = ({ children }) => {
     setChoresState(prev => prev.filter(c => c.id !== id))
   }, [])
 
-  // ─── Complete Chore ───────────────────────────────────────────────────────
+  // ─── Submit Chore (creates pending — no rewards yet) ─────────────────────
 
   const completeChore = useCallback((choreId, timeTaken) => {
     const chore = chores.find(c => c.id === choreId)
     if (!chore || !activeCharacterId) return null
+    if (lockedChoreIds.has(choreId)) return null
 
-    const today = new Date().toISOString().split('T')[0]
     const beatTimer = timeTaken <= chore.estimatedMinutes * 60
 
     const streakActive = (() => {
@@ -87,61 +97,106 @@ export const AppProvider = ({ children }) => {
       if (!last) return false
       const yesterday = new Date()
       yesterday.setDate(yesterday.getDate() - 1)
-      const yStr = yesterday.toISOString().split('T')[0]
-      return streaks.currentStreak >= BALANCE.streakThresholdDays - 1 && last === yStr
+      return streaks.currentStreak >= BALANCE.streakThresholdDays - 1 && last === yesterday.toISOString().split('T')[0]
     })()
 
     const char = characters.find(c => c.id === activeCharacterId)
     const xp = calcXpEarned(chore.difficulty, beatTimer, streakActive, char?.happiness ?? 80)
     const coins = calcCoinsEarned(chore.difficulty, beatTimer, streakActive)
 
-    // Update character
-    const updated = applyXpToCharacter(char, xp)
+    const entry = {
+      id: nanoid(),
+      choreId,
+      choreName: chore.name,
+      choreEmoji: chore.emoji,
+      characterId: activeCharacterId,
+      timeTaken,
+      beatTimer,
+      streakActive,
+      xp,
+      coins,
+      submittedAt: new Date().toISOString(),
+      status: 'pending',
+    }
+
+    setPendingCompletionsState(prev => [...prev, entry])
+    return { xp, coins, beatTimer, streakActive }
+  }, [chores, activeCharacterId, characters, streaks, lockedChoreIds])
+
+  // ─── Approve Chore (parent action — awards rewards) ──────────────────────
+
+  const approveCompletion = useCallback((pendingId) => {
+    const pending = pendingCompletions.find(p => p.id === pendingId)
+    if (!pending) return
+
+    const char = characters.find(c => c.id === pending.characterId)
+    if (!char) return
+
+    const t = today()
+    const updated = applyXpToCharacter(char, pending.xp)
     const evolved = updated.evolved
     delete updated.evolved
     updated.happiness = Math.min(BALANCE.happiness.max, (updated.happiness ?? 80) + 5)
-    updated.lastInteractionDate = today
+    updated.lastInteractionDate = t
 
-    setCharactersState(prev => prev.map(c => c.id === activeCharacterId ? updated : c))
+    setCharactersState(prev => prev.map(c => c.id === pending.characterId ? updated : c))
 
-    // Update kid
     setKidState(prev => {
-      const totalXpEarned = prev.totalXpEarned + xp
-      return {
-        ...prev,
-        coins: prev.coins + coins,
-        totalXpEarned,
-        accountLevel: getAccountLevel(totalXpEarned),
-      }
+      const totalXpEarned = prev.totalXpEarned + pending.xp
+      return { ...prev, coins: prev.coins + pending.coins, totalXpEarned, accountLevel: getAccountLevel(totalXpEarned) }
     })
 
-    // Update streaks
     setStreaksState(prev => {
       const last = prev.lastCompletionDate
       const yesterday = new Date()
       yesterday.setDate(yesterday.getDate() - 1)
       const yStr = yesterday.toISOString().split('T')[0]
-      const newStreak = last === today
-        ? prev.currentStreak
-        : last === yStr
-          ? prev.currentStreak + 1
-          : 1
-      return { currentStreak: newStreak, lastCompletionDate: today }
+      const newStreak = last === t ? prev.currentStreak : last === yStr ? prev.currentStreak + 1 : 1
+      return { currentStreak: newStreak, lastCompletionDate: t }
     })
 
-    // Record completion
-    const entry = { id: nanoid(), choreId, characterId: activeCharacterId, timestamp: new Date().toISOString(), timeTaken, pointsEarned: xp, coinsEarned: coins, bonusApplied: beatTimer }
-    setCompletionsState(prev => [...prev, entry])
+    setCompletionsState(prev => [...prev, {
+      id: nanoid(),
+      choreId: pending.choreId,
+      characterId: pending.characterId,
+      timestamp: new Date().toISOString(),
+      timeTaken: pending.timeTaken,
+      pointsEarned: pending.xp,
+      coinsEarned: pending.coins,
+      bonusApplied: pending.beatTimer,
+    }])
 
-    return { xp, coins, beatTimer, evolved, streakActive, newLevel: updated.level, evolutionStage: updated.evolutionStage }
-  }, [chores, activeCharacterId, characters, streaks])
+    setPendingCompletionsState(prev => prev.map(p => p.id === pendingId ? { ...p, status: 'approved' } : p))
+
+    // Store reward notification for kid
+    setRecentApprovalsState(prev => [...prev, {
+      id: nanoid(),
+      choreName: pending.choreName,
+      choreEmoji: pending.choreEmoji,
+      xp: pending.xp,
+      coins: pending.coins,
+      beatTimer: pending.beatTimer,
+      evolved,
+      newLevel: updated.level,
+      evolutionStage: updated.evolutionStage,
+      characterId: pending.characterId,
+      approvedAt: new Date().toISOString(),
+    }])
+  }, [pendingCompletions, characters])
+
+  const rejectCompletion = useCallback((pendingId) => {
+    setPendingCompletionsState(prev => prev.map(p => p.id === pendingId ? { ...p, status: 'rejected' } : p))
+  }, [])
+
+  const dismissApproval = useCallback((approvalId) => {
+    setRecentApprovalsState(prev => prev.filter(a => a.id !== approvalId))
+  }, [])
 
   // ─── Shop ─────────────────────────────────────────────────────────────────
 
   const buyItem = useCallback((itemId) => {
     const item = SHOP_ITEMS[itemId]
     if (!item || !kid || kid.coins < item.cost) return false
-
     setKidState(prev => ({ ...prev, coins: prev.coins - item.cost }))
     setCharactersState(prev => prev.map(c =>
       c.id === activeCharacterId
@@ -155,19 +210,17 @@ export const AppProvider = ({ children }) => {
   // ─── Photo Queue ──────────────────────────────────────────────────────────
 
   const submitPhoto = useCallback((photoDataUrl) => {
-    const today = new Date().toISOString().split('T')[0]
-    if (settings.lastPhotoSubmissionDate === today) return false
-
+    const t = today()
+    if (settings.lastPhotoSubmissionDate === t) return false
     const entry = { id: nanoid(), photoDataUrl, submittedAt: new Date().toISOString(), status: 'pending', pullResult: null }
     setPhotoQueueState(prev => [...prev, entry])
-    setSettingsState(prev => ({ ...prev, lastPhotoSubmissionDate: today }))
+    setSettingsState(prev => ({ ...prev, lastPhotoSubmissionDate: t }))
     return true
   }, [settings.lastPhotoSubmissionDate])
 
   const approvePhoto = useCallback((photoId) => {
     const ownedIds = characters.map(c => c.id)
     const pulledId = attemptPull(ownedIds, kid?.totalXpEarned ?? 0)
-    // pullResult = characterId on hit, null on miss (kid gets coins instead)
     setPhotoQueueState(prev => prev.map(p =>
       p.id === photoId ? { ...p, status: 'approved', pullResult: pulledId } : p
     ))
@@ -177,14 +230,11 @@ export const AppProvider = ({ children }) => {
   const claimPhotoReward = useCallback((photoId) => {
     const photo = photoQueue.find(p => p.id === photoId)
     if (!photo || photo.status !== 'approved' || photo.claimed) return
-
     if (photo.pullResult) {
       setCharactersState(prev => [...prev, makeCharacterEntry(photo.pullResult)])
     } else {
       setKidState(prev => ({ ...prev, coins: prev.coins + BALANCE.cleanRoomCoins }))
     }
-
-    // Clear photo data from storage, mark claimed
     setPhotoQueueState(prev => prev.map(p =>
       p.id === photoId ? { ...p, claimed: true, photoDataUrl: null } : p
     ))
@@ -206,22 +256,24 @@ export const AppProvider = ({ children }) => {
     setCharactersState(prev => prev.map(c => c.id === id ? { ...c, nickname } : c))
   }, [])
 
-  // ─── Settings ─────────────────────────────────────────────────────────────
-
   const updateSettings = useCallback((updates) => {
     setSettingsState(prev => ({ ...prev, ...updates }))
   }, [])
 
   const pendingPhotoCount = photoQueue.filter(p => p.status === 'pending').length
+  const pendingChoreCount = pendingCompletions.filter(p => p.status === 'pending').length
   const unclaimedPhoto = photoQueue.find(p => p.status === 'approved' && !p.claimed) ?? null
+  const latestApproval = recentApprovals[0] ?? null
 
   return (
     <AppContext.Provider value={{
       kid, characters, activeCharacterId, activeCharacter,
-      chores, completions, streaks, photoQueue, settings, purchaseHistory,
-      pendingPhotoCount, unclaimedPhoto,
+      chores, completions, pendingCompletions, recentApprovals, latestApproval,
+      streaks, photoQueue, settings, purchaseHistory,
+      lockedChoreIds, pendingPhotoCount, pendingChoreCount, unclaimedPhoto,
       setupKid, addChore, updateChore, deleteChore,
-      completeChore, buyItem,
+      completeChore, approveCompletion, rejectCompletion, dismissApproval,
+      buyItem,
       submitPhoto, approvePhoto, rejectPhoto, claimPhotoReward,
       setActiveCharacter, renameCharacter, updateSettings,
     }}>

@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { useAppState } from '../../hooks/useAppState'
 import { CHARACTERS } from '../../config/characters'
 import { storage } from '../../utils/storage'
-import { ArrowLeft, Lock, Trash2, Edit2, CheckCircle, XCircle, Star } from 'lucide-react'
+import { ArrowLeft, Lock, Trash2, Edit2, CheckCircle, XCircle, Star, Hourglass } from 'lucide-react'
 
 export default function ParentModeScreen({ onNavigate }) {
-  const { settings, updateSettings, chores, deleteChore, completions, photoQueue, approvePhoto, rejectPhoto } = useAppState()
+  const { settings, updateSettings, chores, deleteChore, completions, photoQueue, approvePhoto, rejectPhoto, pendingCompletions, approveCompletion, rejectCompletion, pendingChoreCount } = useAppState()
   const [pin, setPin] = useState('')
   const [unlocked, setUnlocked] = useState(false)
   const [pinError, setPinError] = useState(false)
@@ -77,7 +77,7 @@ export default function ParentModeScreen({ onNavigate }) {
           {['queue','chores','history','settings'].map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`flex-1 py-2 rounded-full text-xs font-bold capitalize transition-colors ${tab === t ? 'bg-white text-gray-700' : 'bg-white/15 text-white'}`}>
-              {t === 'queue' ? `📸 Queue${pendingPhotos.length ? ` (${pendingPhotos.length})` : ''}` :
+              {t === 'queue' ? `📋 Queue${(pendingPhotos.length + pendingChoreCount) ? ` (${pendingPhotos.length + pendingChoreCount})` : ''}` :
                t === 'chores' ? '📋 Chores' :
                t === 'history' ? '📊 History' : '⚙️ Settings'}
             </button>
@@ -88,11 +88,43 @@ export default function ParentModeScreen({ onNavigate }) {
       <div className="flex-1 overflow-y-auto pb-8 px-4 py-4">
         {tab === 'queue' && (
           <div className="space-y-4">
-            {pendingPhotos.length === 0 ? (
+
+            {/* Pending chore completions */}
+            {pendingCompletions.filter(p => p.status === 'pending').map(p => (
+              <div key={p.id} className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <Hourglass size={20} className="text-yellow-500 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-black text-gray-800">{p.choreEmoji} {p.choreName}</p>
+                    <p className="text-xs text-gray-400">
+                      {new Date(p.submittedAt).toLocaleString()} •{' '}
+                      {p.beatTimer ? '🏆 Under time! ' : ''}{p.timeTaken < 60 ? `${p.timeTaken}s` : `${Math.floor(p.timeTaken/60)}m ${p.timeTaken%60}s`}
+                    </p>
+                  </div>
+                  <div className="text-right text-sm">
+                    <p className="font-bold text-purple-600">+{p.xp} XP</p>
+                    <p className="font-bold text-amber-600">+{p.coins} 🪙</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => approveCompletion(p.id)}
+                    className="flex-1 flex items-center justify-center gap-1 bg-green-500 text-white font-bold py-2 rounded-xl active:scale-95 transition-transform text-sm">
+                    <CheckCircle size={16} /> Approve
+                  </button>
+                  <button onClick={() => rejectCompletion(p.id)}
+                    className="flex-1 flex items-center justify-center gap-1 bg-red-400 text-white font-bold py-2 rounded-xl active:scale-95 transition-transform text-sm">
+                    <XCircle size={16} /> Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {/* Pending room photos */}
+            {pendingPhotos.length === 0 && pendingChoreCount === 0 ? (
               <div className="text-center py-16 text-gray-400">
-                <p className="text-4xl mb-2">📸</p>
-                <p className="font-bold">No pending photos</p>
-                <p className="text-sm">When your kid submits a room photo, it'll appear here.</p>
+                <p className="text-4xl mb-2">✅</p>
+                <p className="font-bold">Nothing to review</p>
+                <p className="text-sm">Completed chores and room photos will appear here.</p>
               </div>
             ) : pendingPhotos.map(photo => (
               <div key={photo.id} className="bg-white rounded-2xl shadow-sm overflow-hidden">

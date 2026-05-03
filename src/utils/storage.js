@@ -4,6 +4,8 @@ const KEYS = {
   ACTIVE_CHARACTER: 'cq_activeCharacter',
   CHORES: 'cq_chores',
   COMPLETIONS: 'cq_completions',
+  PENDING_COMPLETIONS: 'cq_pendingCompletions',
+  RECENT_APPROVALS: 'cq_recentApprovals',
   STREAKS: 'cq_streaks',
   PHOTO_QUEUE: 'cq_photoQueue',
   SETTINGS: 'cq_settings',
@@ -42,6 +44,12 @@ export const storage = {
 
   getCompletions: () => read(KEYS.COMPLETIONS, []),
   setCompletions: (v) => write(KEYS.COMPLETIONS, v),
+
+  getPendingCompletions: () => read(KEYS.PENDING_COMPLETIONS, []),
+  setPendingCompletions: (v) => write(KEYS.PENDING_COMPLETIONS, v),
+
+  getRecentApprovals: () => read(KEYS.RECENT_APPROVALS, []),
+  setRecentApprovals: (v) => write(KEYS.RECENT_APPROVALS, v),
 
   getStreaks: () => read(KEYS.STREAKS, { currentStreak: 0, lastCompletionDate: null }),
   setStreaks: (v) => write(KEYS.STREAKS, v),

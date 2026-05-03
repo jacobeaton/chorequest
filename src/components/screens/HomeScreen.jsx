@@ -5,10 +5,16 @@ import XPBar from '../shared/XPBar'
 import HappinessBar from '../shared/HappinessBar'
 import CoinDisplay from '../shared/CoinDisplay'
 import ChoreCard from '../shared/ChoreCard'
-import { Settings, Camera, Star } from 'lucide-react'
+import { Settings, Camera, Star, CheckCircle } from 'lucide-react'
 
 export default function HomeScreen({ onNavigate }) {
-  const { kid, activeCharacter, activeCharacterId, chores, streaks, pendingPhotoCount, unclaimedPhoto } = useAppState()
+  const { kid, activeCharacter, activeCharacterId, chores, streaks, pendingPhotoCount, pendingChoreCount, unclaimedPhoto, latestApproval, dismissApproval, lockedChoreIds, pendingCompletions } = useAppState()
+
+  const getChoreStatus = (choreId) => {
+    if (!lockedChoreIds.has(choreId)) return null
+    const p = pendingCompletions.find(p => p.choreId === choreId && p.status !== 'rejected')
+    return p?.status ?? null
+  }
   const char = CHARACTERS[activeCharacterId]
   if (!char || !activeCharacter) return null
 
@@ -29,9 +35,9 @@ export default function HomeScreen({ onNavigate }) {
             <CoinDisplay coins={kid?.coins ?? 0} />
             <button onClick={() => onNavigate('parent')} className="relative bg-white/20 rounded-full p-2">
               <Settings size={20} className="text-white" />
-              {pendingPhotoCount > 0 && (
+              {(pendingPhotoCount + pendingChoreCount) > 0 && (
                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-black rounded-full w-5 h-5 flex items-center justify-center">
-                  {pendingPhotoCount}
+                  {pendingPhotoCount + pendingChoreCount}
                 </span>
               )}
             </button>
@@ -57,6 +63,19 @@ export default function HomeScreen({ onNavigate }) {
 
       {/* Main content */}
       <div className="flex-1 px-4 py-6 space-y-6">
+
+        {/* Approval notification */}
+        {latestApproval && (
+          <div className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-2xl p-4 flex items-center gap-3">
+            <CheckCircle size={28} className="text-green-500 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="font-black text-green-700">Chore approved! 🎉</p>
+              <p className="text-xs text-green-600">{latestApproval.choreEmoji} {latestApproval.choreName} — <strong>+{latestApproval.xp} XP</strong> & <strong>+{latestApproval.coins} 🪙</strong> added!</p>
+            </div>
+            <button onClick={() => dismissApproval(latestApproval.id)} className="text-gray-400 font-bold text-lg px-1">×</button>
+          </div>
+        )}
+
         {/* Big CTA */}
         <button
           onClick={() => onNavigate('chores')}
@@ -73,7 +92,7 @@ export default function HomeScreen({ onNavigate }) {
           </div>
           <div className="space-y-2">
             {todayChores.map(chore => (
-              <ChoreCard key={chore.id} chore={chore} onStart={() => onNavigate('active', { chore })} compact />
+              <ChoreCard key={chore.id} chore={chore} onStart={() => onNavigate('active', { chore })} compact status={getChoreStatus(chore.id)} />
             ))}
           </div>
         </div>
