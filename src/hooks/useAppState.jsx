@@ -530,10 +530,19 @@ export const AppProvider = ({ children }) => {
     })
   }, [kidId])
 
-  const withdrawSavings = useCallback((rewardId) => {
+  const withdrawSavings = useCallback((rewardId, amount) => {
     if (!kidId) return
-    setRewardSavingsState(prev => prev.filter(s => s.rewardId !== rewardId))
-    db.deleteRewardSaving(kidId, rewardId).catch(console.error)
+    setRewardSavingsState(prev => {
+      const existing = prev.find(s => s.rewardId === rewardId)
+      if (!existing) return prev
+      const newBanked = existing.bankedCoins - amount
+      if (newBanked <= 0) {
+        db.deleteRewardSaving(kidId, rewardId).catch(console.error)
+        return prev.filter(s => s.rewardId !== rewardId)
+      }
+      db.upsertRewardSaving(kidId, rewardId, newBanked).catch(console.error)
+      return prev.map(s => s.rewardId === rewardId ? { ...s, bankedCoins: newBanked } : s)
+    })
   }, [kidId])
 
   const redeemCustomReward = useCallback((rewardId) => {

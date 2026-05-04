@@ -14,6 +14,8 @@ export default function LuminRewardsScreen({ onNavigate }) {
   const [editing, setEditing] = useState(false)
   const [nameInput, setNameInput] = useState('')
   const [buyFeedback, setBuyFeedback] = useState(null)
+  // savingMode: { rewardId, type: 'deposit'|'withdraw', amount: '' } | null
+  const [savingMode, setSavingMode] = useState(null)
 
   const char = CHARACTERS[activeCharacterId]
   if (!char || !activeCharacter) return null
@@ -181,10 +183,25 @@ export default function LuminRewardsScreen({ onNavigate }) {
                   const banked = saving?.bankedCoins ?? 0
                   const progress = Math.min(banked / reward.coinCost, 1)
                   const remaining = reward.coinCost - banked
-                  const canBank = spendableCoins > 0 && banked < reward.coinCost
+                  const maxDeposit = Math.min(spendableCoins, remaining)
+                  const canDeposit = spendableCoins > 0 && remaining > 0
                   const canRedeem = (spendableCoins + banked) >= reward.coinCost
                   const canAffordDirect = spendableCoins >= reward.coinCost && banked === 0
                   const pendingCount = rewardRedemptions.filter(r => r.rewardId === reward.id && r.status === 'pending').length
+                  const isDepositMode = savingMode?.rewardId === reward.id && savingMode?.type === 'deposit'
+                  const isWithdrawMode = savingMode?.rewardId === reward.id && savingMode?.type === 'withdraw'
+
+                  const confirmDeposit = () => {
+                    const amt = Math.min(parseInt(savingMode.amount) || 0, maxDeposit)
+                    if (amt > 0) bankCoinsToward(reward.id, amt)
+                    setSavingMode(null)
+                  }
+                  const confirmWithdraw = () => {
+                    const amt = Math.min(parseInt(savingMode.amount) || 0, banked)
+                    if (amt > 0) withdrawSavings(reward.id, amt)
+                    setSavingMode(null)
+                  }
+
                   return (
                     <div key={reward.id} className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
                       <div className="flex items-start gap-3">
@@ -212,40 +229,102 @@ export default function LuminRewardsScreen({ onNavigate }) {
                         </div>
                       )}
 
-                      <div className="flex gap-2">
-                        {canAffordDirect ? (
-                          <button
-                            onClick={() => redeemCustomReward(reward.id)}
-                            className="flex-1 bg-gradient-to-r from-purple-600 to-violet-500 text-white font-black text-sm py-2 rounded-xl active:scale-95 transition-transform"
-                          >
-                            Buy Now
-                          </button>
-                        ) : canRedeem && banked > 0 ? (
-                          <button
-                            onClick={() => redeemCustomReward(reward.id)}
-                            className="flex-1 bg-gradient-to-r from-green-500 to-emerald-400 text-white font-black text-sm py-2 rounded-xl active:scale-95 transition-transform"
-                          >
-                            Redeem 🎉
-                          </button>
-                        ) : canBank ? (
-                          <button
-                            onClick={() => bankCoinsToward(reward.id, Math.min(spendableCoins, remaining))}
-                            className="flex-1 bg-blue-500 text-white font-bold text-sm py-2 rounded-xl active:scale-95 transition-transform"
-                          >
-                            {banked > 0 ? `Save ${Math.min(spendableCoins, remaining)} more` : `Start Saving`}
-                          </button>
-                        ) : (
-                          <div className="flex-1 text-center text-xs text-gray-400 py-2">Earn more coins to save!</div>
-                        )}
-                        {banked > 0 && (
-                          <button
-                            onClick={() => withdrawSavings(reward.id)}
-                            className="px-3 py-2 bg-gray-100 text-gray-600 font-bold text-sm rounded-xl active:scale-95 transition-transform"
-                          >
-                            Withdraw
-                          </button>
-                        )}
-                      </div>
+                      {isDepositMode && (
+                        <div className="bg-blue-50 rounded-xl p-3 space-y-2">
+                          <p className="text-xs font-bold text-blue-700">How many coins to save? (max {maxDeposit})</p>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setSavingMode(m => ({ ...m, amount: String(maxDeposit) }))}
+                              className="px-3 py-1.5 bg-blue-100 text-blue-700 font-bold text-xs rounded-lg"
+                            >
+                              All ({maxDeposit})
+                            </button>
+                            <input
+                              type="number" min="1" max={maxDeposit}
+                              value={savingMode.amount}
+                              onChange={e => setSavingMode(m => ({ ...m, amount: e.target.value }))}
+                              placeholder="Amount"
+                              className="flex-1 border-2 border-blue-200 rounded-lg px-2 py-1 text-sm font-bold outline-none focus:border-blue-400 text-center"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={confirmDeposit} disabled={!parseInt(savingMode.amount) || parseInt(savingMode.amount) > maxDeposit}
+                              className="flex-1 bg-blue-500 text-white font-black text-sm py-1.5 rounded-lg disabled:opacity-40">
+                              Save
+                            </button>
+                            <button onClick={() => setSavingMode(null)} className="px-4 py-1.5 bg-gray-100 text-gray-600 font-bold text-sm rounded-lg">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {isWithdrawMode && (
+                        <div className="bg-orange-50 rounded-xl p-3 space-y-2">
+                          <p className="text-xs font-bold text-orange-700">How many coins to withdraw? (max {banked})</p>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setSavingMode(m => ({ ...m, amount: String(banked) }))}
+                              className="px-3 py-1.5 bg-orange-100 text-orange-700 font-bold text-xs rounded-lg"
+                            >
+                              All ({banked})
+                            </button>
+                            <input
+                              type="number" min="1" max={banked}
+                              value={savingMode.amount}
+                              onChange={e => setSavingMode(m => ({ ...m, amount: e.target.value }))}
+                              placeholder="Amount"
+                              className="flex-1 border-2 border-orange-200 rounded-lg px-2 py-1 text-sm font-bold outline-none focus:border-orange-400 text-center"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={confirmWithdraw} disabled={!parseInt(savingMode.amount) || parseInt(savingMode.amount) > banked}
+                              className="flex-1 bg-orange-400 text-white font-black text-sm py-1.5 rounded-lg disabled:opacity-40">
+                              Withdraw
+                            </button>
+                            <button onClick={() => setSavingMode(null)} className="px-4 py-1.5 bg-gray-100 text-gray-600 font-bold text-sm rounded-lg">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {!isDepositMode && !isWithdrawMode && (
+                        <div className="flex gap-2">
+                          {canAffordDirect ? (
+                            <button
+                              onClick={() => redeemCustomReward(reward.id)}
+                              className="flex-1 bg-gradient-to-r from-purple-600 to-violet-500 text-white font-black text-sm py-2 rounded-xl active:scale-95 transition-transform"
+                            >
+                              Buy Now
+                            </button>
+                          ) : canRedeem && banked > 0 ? (
+                            <button
+                              onClick={() => redeemCustomReward(reward.id)}
+                              className="flex-1 bg-gradient-to-r from-green-500 to-emerald-400 text-white font-black text-sm py-2 rounded-xl active:scale-95 transition-transform"
+                            >
+                              Redeem 🎉
+                            </button>
+                          ) : canDeposit ? (
+                            <button
+                              onClick={() => setSavingMode({ rewardId: reward.id, type: 'deposit', amount: '' })}
+                              className="flex-1 bg-blue-500 text-white font-bold text-sm py-2 rounded-xl active:scale-95 transition-transform"
+                            >
+                              {banked > 0 ? 'Save More' : 'Start Saving'}
+                            </button>
+                          ) : (
+                            <div className="flex-1 text-center text-xs text-gray-400 py-2">Earn more coins to save!</div>
+                          )}
+                          {banked > 0 && (
+                            <button
+                              onClick={() => setSavingMode({ rewardId: reward.id, type: 'withdraw', amount: '' })}
+                              className="px-3 py-2 bg-gray-100 text-gray-600 font-bold text-sm rounded-xl active:scale-95 transition-transform"
+                            >
+                              Withdraw
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
