@@ -125,6 +125,7 @@ export const insertChore = async (parentId, chore) => {
     coins: chore.coins ?? 0,
     difficulty: chore.difficulty,
     created_by: chore.createdBy,
+    frequency: chore.frequency ?? 'daily',
   }).select().single()
   if (error) throw error
   return rowToChore(data)
@@ -137,6 +138,7 @@ export const updateChoreDb = async (choreId, updates) => {
   if (updates.estimatedMinutes !== undefined) row.estimated_minutes = updates.estimatedMinutes
   if (updates.difficulty !== undefined) row.difficulty = updates.difficulty
   if (updates.assignedKidId !== undefined) row.assigned_kid_id = updates.assignedKidId
+  if (updates.frequency !== undefined) row.frequency = updates.frequency
   await supabase.from('chores').update(row).eq('id', choreId)
 }
 
@@ -167,6 +169,7 @@ const rowToChore = (row) => ({
   coins: row.coins,
   difficulty: row.difficulty,
   createdBy: row.created_by,
+  frequency: row.frequency ?? 'daily',
 })
 
 // ─── Pending Completions ───────────────────────────────────────────────────────

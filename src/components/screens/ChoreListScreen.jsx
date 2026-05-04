@@ -9,9 +9,17 @@ export default function ChoreListScreen({ onNavigate, filter: filterProp = 'all'
   const { chores, lockedChoreIds, pendingCompletions } = useAppState()
   const { deviceKidId } = useAuth()
 
-  // Only show chores available to this kid (unassigned or assigned to them)
+  const approvedOneTimeIds = new Set(
+    pendingCompletions
+      .filter(p => p.status === 'approved')
+      .filter(p => chores.find(c => c.id === p.choreId)?.frequency === 'one_time')
+      .map(p => p.choreId)
+  )
+
+  // Only show chores available to this kid; hide completed one-time chores
   const visibleChores = chores.filter(c =>
-    !c.assignedKidId || c.assignedKidId === deviceKidId
+    (!c.assignedKidId || c.assignedKidId === deviceKidId) &&
+    !approvedOneTimeIds.has(c.id)
   )
 
   const getStatus = (choreId) => {

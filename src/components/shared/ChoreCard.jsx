@@ -6,10 +6,16 @@ const DIFFICULTY_STYLES = {
   hard:   { bg: 'bg-red-100',    text: 'text-red-700',    border: 'border-red-200',    label: 'Hard' },
 }
 
+const FREQ_BADGE = {
+  weekly:   { label: 'Weekly',   style: 'bg-blue-100 text-blue-600' },
+  one_time: { label: 'One-time', style: 'bg-orange-100 text-orange-600' },
+}
+
 export default function ChoreCard({ chore, onStart, compact = false, status = null }) {
   // status: null = available, 'pending' = awaiting approval, 'approved' = done today
   const d = DIFFICULTY_STYLES[chore.difficulty]
   const locked = status === 'pending' || status === 'approved'
+  const freqBadge = FREQ_BADGE[chore.frequency]
 
   return (
     <button
@@ -31,6 +37,9 @@ export default function ChoreCard({ chore, onStart, compact = false, status = nu
               <Zap size={11} /> {chore.points} XP
             </span>
             <span className="text-xs text-amber-600 font-semibold">🪙 {chore.coins}</span>
+            {freqBadge && !locked && (
+              <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${freqBadge.style}`}>{freqBadge.label}</span>
+            )}
           </div>
         </div>
         {locked ? (

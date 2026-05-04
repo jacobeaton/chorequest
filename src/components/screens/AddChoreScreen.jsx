@@ -33,6 +33,7 @@ export default function AddChoreScreen({ onNavigate, createdBy = 'kid', existing
   const [points, setPoints] = useState(existingChore?.points ?? BALANCE.xp.medium)
   const [coins, setCoins] = useState(existingChore?.coins ?? BALANCE.coins.medium)
   // Pre-fill assignment: null = all kids, specific id = just that kid
+  const [frequency, setFrequency] = useState(existingChore?.frequency ?? 'daily')
   const [selectedKidIds, setSelectedKidIds] = useState(() => {
     if (existingChore?.assignedKidId) return [existingChore.assignedKidId]
     return kids.map(k => k.id)
@@ -66,9 +67,9 @@ export default function AddChoreScreen({ onNavigate, createdBy = 'kid', existing
     e.preventDefault()
     if (!name.trim()) return
     if (isEditing) {
-      updateChore(existingChore.id, { name: name.trim(), emoji, estimatedMinutes: minutes, points, coins, difficulty, assignedKidId })
+      updateChore(existingChore.id, { name: name.trim(), emoji, estimatedMinutes: minutes, points, coins, difficulty, assignedKidId, frequency })
     } else {
-      addChore({ name: name.trim(), emoji, estimatedMinutes: minutes, points, coins, difficulty, createdBy, assignedKidId })
+      addChore({ name: name.trim(), emoji, estimatedMinutes: minutes, points, coins, difficulty, createdBy, assignedKidId, frequency })
     }
     onNavigate(createdBy === 'parent' ? 'home' : 'chores')
   }
@@ -185,6 +186,32 @@ export default function AddChoreScreen({ onNavigate, createdBy = 'kid', existing
             {selectedKidIds.length === 0 && (
               <p className="text-xs text-amber-500 font-semibold">No kids selected — chore won't appear for anyone.</p>
             )}
+          </div>
+        )}
+
+        {/* Frequency — parent chores only */}
+        {createdBy === 'parent' && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm space-y-2">
+            <label className="text-sm font-bold text-gray-600">Repeats</label>
+            <div className="flex gap-2">
+              {[
+                { value: 'daily', label: 'Daily' },
+                { value: 'weekly', label: 'Weekly' },
+                { value: 'one_time', label: 'One-time' },
+              ].map(({ value, label }) => (
+                <button
+                  key={value} type="button"
+                  onClick={() => setFrequency(value)}
+                  className={`flex-1 py-2 rounded-xl font-bold text-sm transition-colors ${
+                    frequency === value ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-500'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {frequency === 'weekly' && <p className="text-xs text-gray-400">Kid can complete this once every 7 days.</p>}
+            {frequency === 'one_time' && <p className="text-xs text-gray-400">Disappears after it's completed once.</p>}
           </div>
         )}
 

@@ -151,7 +151,13 @@ export const AppProvider = ({ children }) => {
 
   const lockedChoreIds = new Set(
     pendingCompletions
-      .filter(p => p.submittedAt && localDateOf(p.submittedAt) === today() && p.status !== 'rejected')
+      .filter(p => {
+        if (p.status === 'rejected') return false
+        const freq = chores.find(c => c.id === p.choreId)?.frequency ?? 'daily'
+        if (freq === 'one_time') return true
+        if (freq === 'weekly') return (Date.now() - new Date(p.submittedAt)) / 86400000 < 7
+        return p.submittedAt && localDateOf(p.submittedAt) === today()
+      })
       .map(p => p.choreId)
   )
 

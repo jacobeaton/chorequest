@@ -21,7 +21,13 @@ export default function HomeScreen({ onNavigate }) {
 
   const displayName = activeCharacter.nickname ?? char.evolutionNames[activeCharacter.evolutionStage]
   const todayStr = localToday()
-  const todayChores = chores.slice(0, 3)
+  const approvedOneTimeIds = new Set(
+    pendingCompletions
+      .filter(p => p.status === 'approved')
+      .filter(p => chores.find(c => c.id === p.choreId)?.frequency === 'one_time')
+      .map(p => p.choreId)
+  )
+  const todayChores = chores.filter(c => !approvedOneTimeIds.has(c.id)).slice(0, 3)
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-violet-50 to-white flex flex-col">
