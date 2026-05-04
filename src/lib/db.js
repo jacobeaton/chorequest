@@ -61,6 +61,7 @@ export const updateKid = async (kidId, updates) => {
   if (updates.currentStreak !== undefined) row.current_streak = updates.currentStreak
   if (updates.lastCompletionDate !== undefined) row.last_completion_date = updates.lastCompletionDate
   if (updates.lastPhotoSubmissionDate !== undefined) row.last_photo_submission_date = updates.lastPhotoSubmissionDate
+  if (updates.guaranteedLuminPull !== undefined) row.guaranteed_lumin_pull = updates.guaranteedLuminPull
   await supabase.from('kids').update(row).eq('id', kidId)
 }
 
@@ -75,6 +76,7 @@ const rowToKid = (row) => ({
   currentStreak: row.current_streak,
   lastCompletionDate: row.last_completion_date,
   lastPhotoSubmissionDate: row.last_photo_submission_date,
+  guaranteedLuminPull: row.guaranteed_lumin_pull ?? false,
 })
 
 // ─── Kid Characters ────────────────────────────────────────────────────────────
@@ -459,6 +461,18 @@ export const subscribeToPendingCompletions = (onNew) => {
       schema: 'public',
       table: 'pending_completions',
     }, (payload) => onNew(rowToPending(payload.new)))
+    .subscribe()
+  return () => supabase.removeChannel(channel)
+}
+
+export const subscribeToPendingPhotos = (onNew) => {
+  const channel = supabase
+    .channel('photo_queue_new')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'photo_queue',
+    }, (payload) => onNew(rowToPhoto(payload.new)))
     .subscribe()
   return () => supabase.removeChannel(channel)
 }

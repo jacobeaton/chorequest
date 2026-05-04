@@ -13,7 +13,7 @@ const REWARD_EMOJIS = ['🎮','🍕','🎬','🏖️','🛍️','🎢','💰','�
 const today = localToday
 
 export default function ParentDashboard({ onNavigate }) {
-  const { signOut, clearDeviceLock, setDeviceLock, kids, parentSettings, updateParentSettings, createKid, session } = useAuth()
+  const { signOut, clearDeviceLock, setDeviceLock, kids, parentSettings, updateParentSettings, createKid, session, refreshKids } = useAuth()
   const [tab, setTab] = useState('queue')
   const [pendingCompletions, setPendingCompletions] = useState([])
   const [pendingPhotos, setPendingPhotos] = useState([])
@@ -58,6 +58,15 @@ export default function ParentDashboard({ onNavigate }) {
   useEffect(() => {
     const unsub = db.subscribeToPendingCompletions((entry) => {
       setPendingCompletions(prev => [entry, ...prev])
+    })
+    return unsub
+  }, [])
+
+  // Realtime: new pending photos
+  useEffect(() => {
+    const unsub = db.subscribeToPendingPhotos(async (photo) => {
+      const photoDataUrl = photo.photoPath ? await db.getPhotoUrl(photo.photoPath).catch(() => null) : null
+      setPendingPhotos(prev => [{ ...photo, photoDataUrl }, ...prev])
     })
     return unsub
   }, [])
@@ -108,6 +117,7 @@ export default function ParentDashboard({ onNavigate }) {
         lastCompletionDate: t,
       }),
       db.insertKidNotification(p.kidId, 'chore_approved', {
+        completionId: p.id,
         choreName: p.choreName,
         choreEmoji: p.choreEmoji,
         xp: p.xp,
@@ -124,7 +134,15 @@ export default function ParentDashboard({ onNavigate }) {
   }
 
   const handleRejectCompletion = async (id) => {
+    const p = pendingCompletions.find(c => c.id === id)
     await db.updatePendingCompletion(id, { status: 'rejected' })
+    if (p?.kidId) {
+      db.insertKidNotification(p.kidId, 'chore_rejected', {
+        completionId: id,
+        choreName: p.choreName,
+        choreEmoji: p.choreEmoji,
+      }).catch(console.error)
+    }
     setPendingCompletions(prev => prev.filter(c => c.id !== id))
   }
 
@@ -132,12 +150,16 @@ export default function ParentDashboard({ onNavigate }) {
     const kidRow = await db.getKidById(photo.kidId)
     const chars = await db.getKidCharacters(photo.kidId)
     const ownedIds = chars.map(c => c.id)
-    const pulledId = attemptPull(ownedIds, kidRow?.totalXpEarned ?? 0)
+    const forceWin = kidRow?.guaranteedLuminPull ?? false
+    const pulledId = attemptPull(ownedIds, kidRow?.totalXpEarned ?? 0, forceWin)
 
     await db.updatePhotoQueue(photo.id, { status: 'approved', pullResult: pulledId ?? null })
     setRevealedPull(prev => ({ ...prev, [photo.id]: pulledId }))
 
-    // Delete photo from storage after approval
+    if (forceWin) {
+      await db.updateKid(photo.kidId, { guaranteedLuminPull: false })
+      refreshKids()
+    }
     if (photo.photoPath) db.deletePhotoFromStorage(photo.photoPath).catch(() => {})
   }
 
@@ -224,13 +246,14 @@ export default function ParentDashboard({ onNavigate }) {
           </button>
         </div>
         <div className="flex gap-1">
-          {['queue', 'chores', 'rewards', 'settings'].map(t => (
+          {['queue', 'chores', 'rewards', 'kids', 'settings'].map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`flex-1 py-2 rounded-full text-xs font-bold transition-colors ${tab === t ? 'bg-white text-gray-700' : 'bg-white/15 text-white'}`}>
               {t === 'queue'
                 ? `📋${totalPending ? ` (${totalPending})` : ''}`
                 : t === 'chores' ? '📝 Chores'
                 : t === 'rewards' ? '🎁 Rewards'
+                : t === 'kids' ? '👧 Kids'
                 : '⚙️ Settings'}
             </button>
           ))}
@@ -423,6 +446,38 @@ export default function ParentDashboard({ onNavigate }) {
                 </button>
               </div>
             ))}
+          </div>
+        )}
+
+        {tab === 'kids' && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+              <h3 className="font-black text-gray-700">Bonus Lumin Guarantee</h3>
+              <p className="text-xs text-gray-400">Give a kid a guaranteed Lumin on their next clean room photo approval. Great for extra motivation!</p>
+              {kids.length === 0 && <p className="text-sm text-gray-400 text-center py-4">No kids yet.</p>}
+              {kids.map(kid => {
+                const active = kid.guaranteedLuminPull
+                return (
+                  <div key={kid.id} className="flex items-center gap-3 py-2 border-t border-gray-100 first:border-0 first:pt-0">
+                    <div className="flex-1">
+                      <p className="font-bold text-gray-800 text-sm">{kid.name}</p>
+                      <p className="text-xs text-gray-400">{active ? '✨ Next photo pull guaranteed to win!' : 'Normal pull chance'}</p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        await db.updateKid(kid.id, { guaranteedLuminPull: !active })
+                        refreshKids()
+                      }}
+                      className={`px-4 py-2 rounded-xl font-bold text-sm transition-colors ${
+                        active ? 'bg-yellow-400 text-yellow-900' : 'bg-gray-100 text-gray-500'
+                      }`}
+                    >
+                      {active ? '✨ ON' : 'Off'}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
 

@@ -87,7 +87,7 @@ export const AppProvider = ({ children }) => {
       db.getKidNotifications(kidId),
     ]).then(async ([kidRow, chars, choresData, pending, photos, rewards, redemptions, notifications]) => {
       if (kidRow) {
-        setKidState({ name: kidRow.name, totalXpEarned: kidRow.totalXpEarned, coins: kidRow.coins, accountLevel: kidRow.accountLevel })
+        setKidState({ name: kidRow.name, totalXpEarned: kidRow.totalXpEarned, coins: kidRow.coins, accountLevel: kidRow.accountLevel, guaranteedLuminPull: kidRow.guaranteedLuminPull ?? false })
         setActiveCharacterIdState(kidRow.activeCharacterId ?? activeCharacterId)
         setStreaksState({ currentStreak: kidRow.currentStreak, lastCompletionDate: kidRow.lastCompletionDate })
         setSettingsState(prev => ({ ...prev, lastPhotoSubmissionDate: kidRow.lastPhotoSubmissionDate }))
@@ -121,18 +121,22 @@ export const AppProvider = ({ children }) => {
       if (notif.type === 'chore_approved') {
         const approval = { ...notif.payload, id: notif.id, approvedAt: notif.createdAt }
         setRecentApprovalsState(prev => [approval, ...prev])
-        // Refresh kid data from Supabase to get updated XP/coins
-        db.getKidById(kidId).then(kidRow => {
+        Promise.all([
+          db.getKidById(kidId),
+          db.getKidCharacters(kidId),
+          db.getPendingCompletions(kidId),
+        ]).then(([kidRow, chars, pending]) => {
           if (kidRow) {
-            setKidState({ name: kidRow.name, totalXpEarned: kidRow.totalXpEarned, coins: kidRow.coins, accountLevel: kidRow.accountLevel })
+            setKidState({ name: kidRow.name, totalXpEarned: kidRow.totalXpEarned, coins: kidRow.coins, accountLevel: kidRow.accountLevel, guaranteedLuminPull: kidRow.guaranteedLuminPull ?? false })
             setStreaksState({ currentStreak: kidRow.currentStreak, lastCompletionDate: kidRow.lastCompletionDate })
           }
-        }).catch(console.error)
-        db.getKidCharacters(kidId).then(chars => {
           if (chars.length) setCharactersState(applyHappinessDecay(chars))
+          setPendingCompletionsState(pending)
         }).catch(console.error)
+      }
+      if (notif.type === 'chore_rejected') {
         setPendingCompletionsState(prev => prev.map(p =>
-          p.characterId === notif.payload.characterId ? { ...p, status: 'approved' } : p
+          p.id === notif.payload.completionId ? { ...p, status: 'rejected' } : p
         ))
       }
     })
@@ -324,6 +328,7 @@ export const AppProvider = ({ children }) => {
           lastCompletionDate: t,
         }),
         db.insertKidNotification(targetKidId, 'chore_approved', {
+          completionId: pendingId,
           choreName: pending.choreName,
           choreEmoji: pending.choreEmoji,
           xp: pending.xp,
@@ -339,9 +344,19 @@ export const AppProvider = ({ children }) => {
   }, [pendingCompletions, characters, kid, streaks, kidId])
 
   const rejectCompletion = useCallback((pendingId) => {
+    const pending = pendingCompletions.find(p => p.id === pendingId)
     setPendingCompletionsState(prev => prev.map(p => p.id === pendingId ? { ...p, status: 'rejected' } : p))
-    if (kidId) db.updatePendingCompletion(pendingId, { status: 'rejected' }).catch(console.error)
-  }, [kidId])
+    if (kidId) {
+      db.updatePendingCompletion(pendingId, { status: 'rejected' }).catch(console.error)
+      if (pending?.kidId ?? kidId) {
+        db.insertKidNotification(pending?.kidId ?? kidId, 'chore_rejected', {
+          completionId: pendingId,
+          choreName: pending?.choreName,
+          choreEmoji: pending?.choreEmoji,
+        }).catch(console.error)
+      }
+    }
+  }, [kidId, pendingCompletions])
 
   const dismissApproval = useCallback((approvalId) => {
     setRecentApprovalsState(prev => prev.filter(a => a.id !== approvalId))
@@ -401,17 +416,22 @@ export const AppProvider = ({ children }) => {
 
   const approvePhoto = useCallback((photoId) => {
     const ownedIds = characters.map(c => c.id)
-    const pulledId = attemptPull(ownedIds, kid?.totalXpEarned ?? 0)
+    const forceWin = kid?.guaranteedLuminPull ?? false
+    const pulledId = attemptPull(ownedIds, kid?.totalXpEarned ?? 0, forceWin)
     setPhotoQueueState(prev => prev.map(p =>
       p.id === photoId ? { ...p, status: 'approved', pullResult: pulledId } : p
     ))
+    if (forceWin && kidId) {
+      setKidState(prev => ({ ...prev, guaranteedLuminPull: false }))
+      db.updateKid(kidId, { guaranteedLuminPull: false }).catch(console.error)
+    }
     const photo = photoQueue.find(p => p.id === photoId)
     if (photo) {
       db.updatePhotoQueue(photoId, { status: 'approved', pullResult: pulledId ?? null }).catch(console.error)
       if (photo.photoPath) db.deletePhotoFromStorage(photo.photoPath).catch(console.error)
     }
     return pulledId
-  }, [characters, kid, photoQueue])
+  }, [characters, kid, photoQueue, kidId])
 
   const claimPhotoReward = useCallback((photoId) => {
     const photo = photoQueue.find(p => p.id === photoId)

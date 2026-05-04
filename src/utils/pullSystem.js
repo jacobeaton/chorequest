@@ -32,8 +32,8 @@ const pickRarity = (weights) => {
   return 'common'
 }
 
-export const attemptPull = (ownedIds, totalXp) => {
-  if (Math.random() < BALANCE.pull.missChance) return null
+export const attemptPull = (ownedIds, totalXp, forceWin = false) => {
+  if (!forceWin && Math.random() < BALANCE.pull.missChance) return null
 
   const weights = getRarityWeights(totalXp)
   const rarity = pickRarity(weights)
