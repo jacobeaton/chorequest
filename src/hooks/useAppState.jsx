@@ -41,7 +41,7 @@ export const AppProvider = ({ children }) => {
   const [pendingCompletions, setPendingCompletionsState] = useState(() => storage.getPendingCompletions())
   const [recentApprovals, setRecentApprovalsState] = useState(() => storage.getRecentApprovals())
   const [streaks, setStreaksState] = useState(() => storage.getStreaks())
-  const [photoQueue, setPhotoQueueState] = useState(() => storage.getPhotoQueue())
+  const [photoQueue, setPhotoQueueState] = useState([])
   const [settings, setSettingsState] = useState(() => storage.getSettings())
   const [purchaseHistory, setPurchaseHistoryState] = useState(() => storage.getPurchaseHistory())
   const [customRewards, setCustomRewardsState] = useState(() => storage.getCustomRewards())
@@ -57,7 +57,6 @@ export const AppProvider = ({ children }) => {
   useEffect(() => { storage.setPendingCompletions(pendingCompletions) }, [pendingCompletions])
   useEffect(() => { storage.setRecentApprovals(recentApprovals) }, [recentApprovals])
   useEffect(() => { storage.setStreaks(streaks) }, [streaks])
-  useEffect(() => { storage.setPhotoQueue(photoQueue) }, [photoQueue])
   useEffect(() => { storage.setSettings(settings) }, [settings])
   useEffect(() => { storage.setPurchaseHistory(purchaseHistory) }, [purchaseHistory])
   useEffect(() => { storage.setCustomRewards(customRewards) }, [customRewards])
@@ -104,7 +103,7 @@ export const AppProvider = ({ children }) => {
         ...p,
         photoDataUrl: (!p.claimed && p.photoPath) ? await db.getPhotoUrl(p.photoPath).catch(() => null) : (p.photoDataUrl ?? null),
       })))
-      if (photos.length) setPhotoQueueState(photosWithUrls)
+      setPhotoQueueState(photosWithUrls)
 
       // Convert notifications to recentApprovals
       const approvals = notifications
