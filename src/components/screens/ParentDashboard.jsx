@@ -20,6 +20,8 @@ export default function ParentDashboard({ onNavigate }) {
   const [chores, setChores] = useState([])
   const [customRewards, setCustomRewards] = useState([])
   const [rewardRedemptions, setRewardRedemptions] = useState([])
+  const [rewardSuggestions, setRewardSuggestions] = useState([])
+  const [approvingSuggestion, setApprovingSuggestion] = useState(null) // { id, coinCost: '' }
   const [revealedPull, setRevealedPull] = useState({})
   const [newReward, setNewReward] = useState({ name: '', emoji: '🎁', description: '', coinCost: 100, assignedKidId: null })
   const [addingReward, setAddingReward] = useState(false)
@@ -32,12 +34,13 @@ export default function ParentDashboard({ onNavigate }) {
   const [addKidLoading, setAddKidLoading] = useState(false)
 
   const loadData = useCallback(async () => {
-    const [pending, photos, choresData, rewards, redemptions] = await Promise.all([
+    const [pending, photos, choresData, rewards, redemptions, suggestions] = await Promise.all([
       db.getAllPendingCompletions(),
       db.getAllPendingPhotos(),
       db.getChores(),
       db.getCustomRewards(),
       db.getAllRewardRedemptions(),
+      db.getAllPendingRewardSuggestions(),
     ])
     // Load signed URLs for photos
     const photosWithUrls = await Promise.all(photos.map(async p => ({
@@ -49,6 +52,7 @@ export default function ParentDashboard({ onNavigate }) {
     setChores(choresData)
     setCustomRewards(rewards)
     setRewardRedemptions(redemptions)
+    setRewardSuggestions(suggestions)
     setLoading(false)
   }, [])
 
@@ -219,8 +223,27 @@ export default function ParentDashboard({ onNavigate }) {
     setRewardRedemptions(prev => prev.map(x => x.id === r.id ? { ...x, status: 'rejected' } : x))
   }
 
+  const handleApproveSuggestion = async (suggestion, coinCost) => {
+    const created = await db.insertCustomReward(session?.user?.id, {
+      name: suggestion.name,
+      emoji: suggestion.emoji,
+      description: suggestion.description,
+      coinCost,
+      assignedKidId: suggestion.kidId,
+    })
+    await db.updateRewardSuggestion(suggestion.id, { status: 'approved' })
+    setCustomRewards(prev => [...prev, created])
+    setRewardSuggestions(prev => prev.filter(s => s.id !== suggestion.id))
+    setApprovingSuggestion(null)
+  }
+
+  const handleRejectSuggestion = async (id) => {
+    await db.updateRewardSuggestion(id, { status: 'rejected' })
+    setRewardSuggestions(prev => prev.filter(s => s.id !== id))
+  }
+
   const pendingRedemptions = rewardRedemptions.filter(r => r.status === 'pending')
-  const totalPending = pendingCompletions.length + pendingPhotos.length + pendingRedemptions.length
+  const totalPending = pendingCompletions.length + pendingPhotos.length + pendingRedemptions.length + rewardSuggestions.length
 
   if (loading) {
     return (
@@ -349,6 +372,68 @@ export default function ParentDashboard({ onNavigate }) {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {rewardSuggestions.length > 0 && (
+              <div className="space-y-2">
+                <h3 className="font-black text-gray-600 text-xs uppercase tracking-wider">💡 Reward Suggestions</h3>
+                {rewardSuggestions.map(s => {
+                  const isApproving = approvingSuggestion?.id === s.id
+                  return (
+                    <div key={s.id} className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl">{s.emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-black text-gray-800">{s.name}</p>
+                          {s.description ? <p className="text-xs text-gray-500">{s.description}</p> : null}
+                          <p className="text-xs text-gray-400">{s.kidName}</p>
+                        </div>
+                      </div>
+                      {isApproving ? (
+                        <div className="space-y-2">
+                          <div className="flex gap-2 items-center">
+                            <span className="text-sm font-bold text-gray-600">🪙 Coin cost:</span>
+                            <input
+                              type="number" min="1" max="9999"
+                              value={approvingSuggestion.coinCost}
+                              onChange={e => setApprovingSuggestion(a => ({ ...a, coinCost: e.target.value }))}
+                              placeholder="e.g. 200"
+                              className="w-28 border-2 border-green-200 rounded-xl px-3 py-1.5 font-black text-gray-800 outline-none focus:border-green-400 text-sm"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              disabled={!parseInt(approvingSuggestion.coinCost)}
+                              onClick={() => handleApproveSuggestion(s, parseInt(approvingSuggestion.coinCost))}
+                              className="flex-1 flex items-center justify-center gap-1 bg-green-500 text-white font-bold py-2 rounded-xl text-sm active:scale-95 disabled:opacity-40"
+                            >
+                              <CheckCircle size={14} /> Confirm
+                            </button>
+                            <button onClick={() => setApprovingSuggestion(null)} className="flex-1 bg-gray-100 text-gray-600 font-bold py-2 rounded-xl text-sm">
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setApprovingSuggestion({ id: s.id, coinCost: '' })}
+                            className="flex-1 flex items-center justify-center gap-1 bg-green-500 text-white font-bold py-2 rounded-xl active:scale-95 transition-transform text-sm"
+                          >
+                            <CheckCircle size={16} /> Approve
+                          </button>
+                          <button
+                            onClick={() => handleRejectSuggestion(s.id)}
+                            className="flex-1 flex items-center justify-center gap-1 bg-red-400 text-white font-bold py-2 rounded-xl active:scale-95 transition-transform text-sm"
+                          >
+                            <XCircle size={16} /> Reject
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
 

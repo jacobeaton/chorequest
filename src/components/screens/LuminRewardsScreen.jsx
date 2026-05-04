@@ -9,13 +9,16 @@ import CoinDisplay from '../shared/CoinDisplay'
 import { ArrowLeft, Edit2, Check } from 'lucide-react'
 
 export default function LuminRewardsScreen({ onNavigate }) {
-  const { kid, characters, activeCharacterId, activeCharacter, setActiveCharacter, renameCharacter, buyItem, customRewards, redeemCustomReward, rewardRedemptions, rewardSavings, spendableCoins, bankCoinsToward, withdrawSavings, kidId } = useAppState()
+  const { kid, characters, activeCharacterId, activeCharacter, setActiveCharacter, renameCharacter, buyItem, customRewards, redeemCustomReward, rewardRedemptions, rewardSavings, rewardSuggestions, spendableCoins, bankCoinsToward, withdrawSavings, suggestReward, kidId } = useAppState()
   const [tab, setTab] = useState('companion') // 'companion' | 'collection' | 'shop' | 'rewards'
   const [editing, setEditing] = useState(false)
   const [nameInput, setNameInput] = useState('')
   const [buyFeedback, setBuyFeedback] = useState(null)
   // savingMode: { rewardId, type: 'deposit'|'withdraw', amount: '' } | null
   const [savingMode, setSavingMode] = useState(null)
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestionForm, setSuggestionForm] = useState({ name: '', emoji: '🎁', description: '' })
+  const [suggestionLoading, setSuggestionLoading] = useState(false)
 
   const char = CHARACTERS[activeCharacterId]
   if (!char || !activeCharacter) return null
@@ -330,12 +333,85 @@ export default function LuminRewardsScreen({ onNavigate }) {
                 })}
               </div>
             )}
+
+            {/* Suggest a reward */}
+            <div className="border-t border-gray-100 pt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-black text-gray-600">💡 Suggest a Reward</p>
+                <button onClick={() => setSuggesting(s => !s)} className="text-purple-600 font-bold text-sm">
+                  {suggesting ? 'Cancel' : '+ Suggest'}
+                </button>
+              </div>
+
+              {suggesting && (
+                <div className="bg-purple-50 rounded-2xl p-4 space-y-3">
+                  <div className="flex flex-wrap gap-2 mb-1">
+                    {SUGGEST_EMOJIS.map(e => (
+                      <button key={e} onClick={() => setSuggestionForm(f => ({ ...f, emoji: e }))}
+                        className={`text-xl p-1 rounded-lg ${suggestionForm.emoji === e ? 'bg-purple-200 ring-2 ring-purple-400' : ''}`}>
+                        {e}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="text" placeholder="What reward do you want?"
+                    value={suggestionForm.name}
+                    onChange={e => setSuggestionForm(f => ({ ...f, name: e.target.value }))}
+                    maxLength={30}
+                    className="w-full border-2 border-purple-200 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none focus:border-purple-400 text-sm"
+                  />
+                  <input
+                    type="text" placeholder="Why do you want it? (optional)"
+                    value={suggestionForm.description}
+                    onChange={e => setSuggestionForm(f => ({ ...f, description: e.target.value }))}
+                    maxLength={60}
+                    className="w-full border-2 border-purple-200 rounded-xl px-3 py-2 text-gray-700 outline-none focus:border-purple-400 text-sm"
+                  />
+                  <button
+                    disabled={!suggestionForm.name.trim() || suggestionLoading}
+                    onClick={async () => {
+                      setSuggestionLoading(true)
+                      await suggestReward(suggestionForm)
+                      setSuggestionForm({ name: '', emoji: '🎁', description: '' })
+                      setSuggesting(false)
+                      setSuggestionLoading(false)
+                    }}
+                    className="w-full bg-purple-600 text-white font-black py-2 rounded-xl disabled:opacity-40 active:scale-95"
+                  >
+                    Send to Parent
+                  </button>
+                </div>
+              )}
+
+              {rewardSuggestions.length > 0 && (
+                <div className="space-y-2">
+                  {rewardSuggestions.map(s => (
+                    <div key={s.id} className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm">
+                      <span className="text-2xl">{s.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-gray-800 text-sm truncate">{s.name}</p>
+                        {s.description ? <p className="text-xs text-gray-400 truncate">{s.description}</p> : null}
+                      </div>
+                      <span className={`text-xs font-bold px-2 py-1 rounded-full flex-shrink-0 ${
+                        s.status === 'approved' ? 'bg-green-100 text-green-700' :
+                        s.status === 'rejected' ? 'bg-red-100 text-red-600' :
+                        'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {s.status === 'approved' ? '✓ Approved' : s.status === 'rejected' ? '✗ Rejected' : '⏳ Pending'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
     </div>
   )
 }
+
+const SUGGEST_EMOJIS = ['🎁','🎮','🍕','🎬','🏖️','🛍️','🎢','💰','🍦','🎠','🎯','📱','🎲','⭐','🚀']
 
 const rarityStyle = {
   common: 'bg-gray-100 text-gray-500',

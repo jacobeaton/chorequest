@@ -47,6 +47,7 @@ export const AppProvider = ({ children }) => {
   const [customRewards, setCustomRewardsState] = useState(() => storage.getCustomRewards())
   const [rewardRedemptions, setRewardRedemptionsState] = useState(() => storage.getRewardRedemptions())
   const [rewardSavings, setRewardSavingsState] = useState([])
+  const [rewardSuggestions, setRewardSuggestionsState] = useState([])
 
   // ─── Sync to localStorage ─────────────────────────────────────────────────────
 
@@ -87,7 +88,8 @@ export const AppProvider = ({ children }) => {
       db.getRewardRedemptions(kidId),
       db.getKidNotifications(kidId),
       db.getRewardSavings(kidId),
-    ]).then(async ([kidRow, chars, choresData, pending, photos, rewards, redemptions, notifications, savings]) => {
+      db.getKidRewardSuggestions(kidId),
+    ]).then(async ([kidRow, chars, choresData, pending, photos, rewards, redemptions, notifications, savings, suggestions]) => {
       if (kidRow) {
         setKidState({ name: kidRow.name, totalXpEarned: kidRow.totalXpEarned, coins: kidRow.coins, accountLevel: kidRow.accountLevel, guaranteedLuminPull: kidRow.guaranteedLuminPull ?? false })
         setActiveCharacterIdState(kidRow.activeCharacterId ?? activeCharacterId)
@@ -100,6 +102,7 @@ export const AppProvider = ({ children }) => {
       if (rewards.length) setCustomRewardsState(rewards)
       if (redemptions.length) setRewardRedemptionsState(redemptions)
       setRewardSavingsState(savings)
+      setRewardSuggestionsState(suggestions)
 
       // Load signed URLs for approved unclaimed photos
       const photosWithUrls = await Promise.all(photos.map(async p => ({
@@ -517,6 +520,12 @@ export const AppProvider = ({ children }) => {
     db.deleteCustomRewardDb(id).catch(console.error)
   }, [])
 
+  const suggestReward = useCallback(async (suggestion) => {
+    if (!kidId) return
+    const created = await db.insertRewardSuggestion(kidId, suggestion)
+    setRewardSuggestionsState(prev => [created, ...prev])
+  }, [kidId])
+
   const bankCoinsToward = useCallback((rewardId, amount) => {
     if (!kidId || amount <= 0) return
     setRewardSavingsState(prev => {
@@ -614,7 +623,7 @@ export const AppProvider = ({ children }) => {
       kid, characters, activeCharacterId, activeCharacter,
       chores, completions, pendingCompletions, recentApprovals, latestApproval,
       streaks, photoQueue, settings: mergedSettings, purchaseHistory,
-      customRewards, rewardRedemptions, rewardSavings, spendableCoins, kidId,
+      customRewards, rewardRedemptions, rewardSavings, rewardSuggestions, spendableCoins, kidId,
       lockedChoreIds, pendingPhotoCount, pendingChoreCount, pendingRedemptionCount, unclaimedPhoto,
       setupKid, addChore, updateChore, deleteChore,
       completeChore, approveCompletion, rejectCompletion, dismissApproval,
@@ -622,7 +631,7 @@ export const AppProvider = ({ children }) => {
       submitPhoto, approvePhoto, rejectPhoto, claimPhotoReward,
       setActiveCharacter, renameCharacter, updateSettings,
       addCustomReward, deleteCustomReward, redeemCustomReward, fulfillRedemption, rejectRedemption,
-      bankCoinsToward, withdrawSavings,
+      bankCoinsToward, withdrawSavings, suggestReward,
     }}>
       {children}
     </AppContext.Provider>

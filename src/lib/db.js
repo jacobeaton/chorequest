@@ -368,6 +368,46 @@ export const deleteRewardSaving = async (kidId, rewardId) => {
   await supabase.from('kid_reward_savings').delete().eq('kid_id', kidId).eq('reward_id', rewardId)
 }
 
+// ─── Reward Suggestions ────────────────────────────────────────────────────────
+
+const rowToSuggestion = (row) => ({
+  id: row.id,
+  kidId: row.kid_id,
+  kidName: row.kids?.name ?? null,
+  name: row.name,
+  emoji: row.emoji,
+  description: row.description,
+  status: row.status,
+  createdAt: row.created_at,
+})
+
+export const insertRewardSuggestion = async (kidId, suggestion) => {
+  const { data, error } = await supabase.from('reward_suggestions').insert({
+    kid_id: kidId,
+    name: suggestion.name,
+    emoji: suggestion.emoji,
+    description: suggestion.description ?? '',
+  }).select().single()
+  if (error) throw error
+  return rowToSuggestion(data)
+}
+
+export const getKidRewardSuggestions = async (kidId) => {
+  const { data } = await supabase.from('reward_suggestions').select('*').eq('kid_id', kidId).order('created_at', { ascending: false })
+  return (data ?? []).map(rowToSuggestion)
+}
+
+export const getAllPendingRewardSuggestions = async () => {
+  const { data } = await supabase.from('reward_suggestions').select('*, kids(name)').eq('status', 'pending').order('created_at')
+  return (data ?? []).map(rowToSuggestion)
+}
+
+export const updateRewardSuggestion = async (id, updates) => {
+  const row = {}
+  if (updates.status !== undefined) row.status = updates.status
+  await supabase.from('reward_suggestions').update(row).eq('id', id)
+}
+
 const rowToReward = (row) => ({
   id: row.id,
   parentId: row.parent_id,
