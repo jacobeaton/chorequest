@@ -520,7 +520,14 @@ export const subscribeToPendingCompletions = (onNew) => {
       event: 'INSERT',
       schema: 'public',
       table: 'pending_completions',
-    }, (payload) => onNew(rowToPending(payload.new)))
+    }, async (payload) => {
+      const { data } = await supabase
+        .from('pending_completions')
+        .select('*, kids(name)')
+        .eq('id', payload.new.id)
+        .single()
+      if (data) onNew({ ...rowToPending(data), kidName: data.kids?.name })
+    })
     .subscribe()
   return () => supabase.removeChannel(channel)
 }
@@ -532,7 +539,14 @@ export const subscribeToPendingPhotos = (onNew) => {
       event: 'INSERT',
       schema: 'public',
       table: 'photo_queue',
-    }, (payload) => onNew(rowToPhoto(payload.new)))
+    }, async (payload) => {
+      const { data } = await supabase
+        .from('photo_queue')
+        .select('*, kids(name)')
+        .eq('id', payload.new.id)
+        .single()
+      if (data) onNew({ ...rowToPhoto(data), kidName: data.kids?.name })
+    })
     .subscribe()
   return () => supabase.removeChannel(channel)
 }

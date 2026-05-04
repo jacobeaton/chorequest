@@ -9,7 +9,7 @@ import ChoreCard from '../shared/ChoreCard'
 import { Settings, Camera, Star, CheckCircle } from 'lucide-react'
 
 export default function HomeScreen({ onNavigate }) {
-  const { kid, activeCharacter, activeCharacterId, chores, streaks, pendingPhotoCount, pendingChoreCount, unclaimedPhoto, latestApproval, dismissApproval, lockedChoreIds, pendingCompletions } = useAppState()
+  const { kid, activeCharacter, activeCharacterId, chores, streaks, pendingPhotoCount, pendingChoreCount, unclaimedPhoto, latestApproval, dismissApproval, lockedChoreIds, pendingCompletions, spendableCoins } = useAppState()
 
   const getChoreStatus = (choreId) => {
     if (!lockedChoreIds.has(choreId)) return null
@@ -39,7 +39,7 @@ export default function HomeScreen({ onNavigate }) {
             <h1 className="text-white font-black text-2xl">{displayName}</h1>
           </div>
           <div className="flex items-center gap-2">
-            <CoinDisplay coins={kid?.coins ?? 0} />
+            <CoinDisplay coins={spendableCoins} total={kid?.coins ?? 0} />
             <button onClick={() => onNavigate('parent')} className="relative bg-white/20 rounded-full p-2">
               <Settings size={20} className="text-white" />
               {(pendingPhotoCount + pendingChoreCount) > 0 && (
