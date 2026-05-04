@@ -433,11 +433,15 @@ export const AppProvider = ({ children }) => {
     setPhotoQueueState(prev => prev.map(p =>
       p.id === photoId ? { ...p, status: 'rejected', photoDataUrl: null } : p
     ))
+    // Clear the daily limit so the kid can resubmit after rejection
+    setSettingsState(prev => ({ ...prev, lastPhotoSubmissionDate: null }))
     if (photo) {
       db.updatePhotoQueue(photoId, { status: 'rejected', photoPath: null }).catch(console.error)
       if (photo.photoPath) db.deletePhotoFromStorage(photo.photoPath).catch(console.error)
+      const targetKidId = photo.kidId ?? kidId
+      if (targetKidId) db.updateKid(targetKidId, { lastPhotoSubmissionDate: null }).catch(console.error)
     }
-  }, [photoQueue])
+  }, [photoQueue, kidId])
 
   // ─── Character Management ─────────────────────────────────────────────────────
 

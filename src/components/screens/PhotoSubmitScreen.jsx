@@ -161,7 +161,7 @@ function PhotoResultScreen({ photo, onNavigate }) {
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function PhotoSubmitScreen({ onNavigate }) {
-  const { submitPhoto, settings, unclaimedPhoto } = useAppState()
+  const { submitPhoto, settings, unclaimedPhoto, photoQueue } = useAppState()
   const [preview, setPreview] = useState(null)
   const [submitted, setSubmitted] = useState(false)
   const fileRef = useRef(null)
@@ -170,8 +170,9 @@ export default function PhotoSubmitScreen({ onNavigate }) {
     return <PhotoResultScreen photo={unclaimedPhoto} onNavigate={onNavigate} />
   }
 
+  const pendingPhoto = photoQueue.find(p => p.status === 'pending')
   const today = localToday()
-  const alreadySubmitted = settings.lastPhotoSubmissionDate === today
+  const alreadySubmitted = !pendingPhoto && settings.lastPhotoSubmissionDate === today
 
   const handleFile = (e) => {
     const file = e.target.files?.[0]
@@ -187,7 +188,7 @@ export default function PhotoSubmitScreen({ onNavigate }) {
     if (success) setSubmitted(true)
   }
 
-  if (submitted) {
+  if (submitted || pendingPhoto) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-pink-500 to-rose-400 flex flex-col items-center justify-center px-6 text-center">
         <div className="text-6xl mb-4 animate-bounce">📸</div>
