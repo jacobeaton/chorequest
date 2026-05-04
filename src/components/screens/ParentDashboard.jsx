@@ -13,7 +13,7 @@ const REWARD_EMOJIS = ['🎮','🍕','🎬','🏖️','🛍️','🎢','💰','�
 const today = localToday
 
 export default function ParentDashboard({ onNavigate }) {
-  const { signOut, clearDeviceLock, setDeviceLock, kids, parentSettings, updateParentSettings, createKid } = useAuth()
+  const { signOut, clearDeviceLock, setDeviceLock, kids, parentSettings, updateParentSettings, createKid, session } = useAuth()
   const [tab, setTab] = useState('queue')
   const [pendingCompletions, setPendingCompletions] = useState([])
   const [pendingPhotos, setPendingPhotos] = useState([])
@@ -156,7 +156,7 @@ export default function ParentDashboard({ onNavigate }) {
 
   const handleAddReward = async () => {
     if (!newReward.name.trim()) return
-    const created = await db.insertCustomReward(null, newReward) // parentId from RLS
+    const created = await db.insertCustomReward(session?.user?.id, newReward)
     setCustomRewards(prev => [...prev, created])
     setNewReward({ name: '', emoji: '🎁', description: '', coinCost: 100 })
     setAddingReward(false)
