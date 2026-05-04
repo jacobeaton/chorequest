@@ -340,6 +340,7 @@ export const insertCustomReward = async (parentId, reward) => {
     emoji: reward.emoji,
     description: reward.description ?? '',
     coin_cost: reward.coinCost,
+    assigned_kid_id: reward.assignedKidId ?? null,
   }).select().single()
   if (error) throw error
   return rowToReward(data)
@@ -349,6 +350,24 @@ export const deleteCustomRewardDb = async (id) => {
   await supabase.from('custom_rewards').delete().eq('id', id)
 }
 
+// ─── Reward Savings ────────────────────────────────────────────────────────────
+
+export const getRewardSavings = async (kidId) => {
+  const { data } = await supabase.from('kid_reward_savings').select('*').eq('kid_id', kidId)
+  return (data ?? []).map(row => ({ kidId: row.kid_id, rewardId: row.reward_id, bankedCoins: row.banked_coins }))
+}
+
+export const upsertRewardSaving = async (kidId, rewardId, bankedCoins) => {
+  await supabase.from('kid_reward_savings').upsert(
+    { kid_id: kidId, reward_id: rewardId, banked_coins: bankedCoins },
+    { onConflict: 'kid_id,reward_id' }
+  )
+}
+
+export const deleteRewardSaving = async (kidId, rewardId) => {
+  await supabase.from('kid_reward_savings').delete().eq('kid_id', kidId).eq('reward_id', rewardId)
+}
+
 const rowToReward = (row) => ({
   id: row.id,
   parentId: row.parent_id,
@@ -356,6 +375,7 @@ const rowToReward = (row) => ({
   emoji: row.emoji,
   description: row.description,
   coinCost: row.coin_cost,
+  assignedKidId: row.assigned_kid_id ?? null,
 })
 
 // ─── Reward Redemptions ────────────────────────────────────────────────────────

@@ -46,6 +46,7 @@ export const AppProvider = ({ children }) => {
   const [purchaseHistory, setPurchaseHistoryState] = useState(() => storage.getPurchaseHistory())
   const [customRewards, setCustomRewardsState] = useState(() => storage.getCustomRewards())
   const [rewardRedemptions, setRewardRedemptionsState] = useState(() => storage.getRewardRedemptions())
+  const [rewardSavings, setRewardSavingsState] = useState([])
 
   // ─── Sync to localStorage ─────────────────────────────────────────────────────
 
@@ -85,7 +86,8 @@ export const AppProvider = ({ children }) => {
       db.getCustomRewards(),
       db.getRewardRedemptions(kidId),
       db.getKidNotifications(kidId),
-    ]).then(async ([kidRow, chars, choresData, pending, photos, rewards, redemptions, notifications]) => {
+      db.getRewardSavings(kidId),
+    ]).then(async ([kidRow, chars, choresData, pending, photos, rewards, redemptions, notifications, savings]) => {
       if (kidRow) {
         setKidState({ name: kidRow.name, totalXpEarned: kidRow.totalXpEarned, coins: kidRow.coins, accountLevel: kidRow.accountLevel, guaranteedLuminPull: kidRow.guaranteedLuminPull ?? false })
         setActiveCharacterIdState(kidRow.activeCharacterId ?? activeCharacterId)
@@ -97,6 +99,7 @@ export const AppProvider = ({ children }) => {
       if (pending.length) setPendingCompletionsState(pending)
       if (rewards.length) setCustomRewardsState(rewards)
       if (redemptions.length) setRewardRedemptionsState(redemptions)
+      setRewardSavingsState(savings)
 
       // Load signed URLs for approved unclaimed photos
       const photosWithUrls = await Promise.all(photos.map(async p => ({
@@ -514,9 +517,32 @@ export const AppProvider = ({ children }) => {
     db.deleteCustomRewardDb(id).catch(console.error)
   }, [])
 
+  const bankCoinsToward = useCallback((rewardId, amount) => {
+    if (!kidId || amount <= 0) return
+    setRewardSavingsState(prev => {
+      const idx = prev.findIndex(s => s.rewardId === rewardId)
+      const newBanked = (idx >= 0 ? prev[idx].bankedCoins : 0) + amount
+      const updated = idx >= 0
+        ? prev.map(s => s.rewardId === rewardId ? { ...s, bankedCoins: newBanked } : s)
+        : [...prev, { kidId, rewardId, bankedCoins: newBanked }]
+      db.upsertRewardSaving(kidId, rewardId, newBanked).catch(console.error)
+      return updated
+    })
+  }, [kidId])
+
+  const withdrawSavings = useCallback((rewardId) => {
+    if (!kidId) return
+    setRewardSavingsState(prev => prev.filter(s => s.rewardId !== rewardId))
+    db.deleteRewardSaving(kidId, rewardId).catch(console.error)
+  }, [kidId])
+
   const redeemCustomReward = useCallback((rewardId) => {
     const reward = customRewards.find(r => r.id === rewardId)
-    if (!reward || !kid || kid.coins < reward.coinCost) return false
+    if (!reward || !kid) return false
+    const banked = rewardSavings.find(s => s.rewardId === rewardId)?.bankedCoins ?? 0
+    const totalBanked = rewardSavings.reduce((sum, s) => sum + s.bankedCoins, 0)
+    const spendable = kid.coins - totalBanked
+    if (spendable + banked < reward.coinCost) return false
 
     const newCoins = kid.coins - reward.coinCost
     const redemption = {
@@ -531,15 +557,17 @@ export const AppProvider = ({ children }) => {
     }
     setKidState(prev => ({ ...prev, coins: newCoins }))
     setRewardRedemptionsState(prev => [...prev, redemption])
+    if (banked > 0) setRewardSavingsState(prev => prev.filter(s => s.rewardId !== rewardId))
 
     if (kidId) {
       Promise.all([
         db.updateKid(kidId, { coins: newCoins }),
         db.insertRewardRedemption(kidId, redemption),
+        banked > 0 ? db.deleteRewardSaving(kidId, rewardId) : Promise.resolve(),
       ]).catch(console.error)
     }
     return true
-  }, [customRewards, kid, kidId])
+  }, [customRewards, kid, kidId, rewardSavings])
 
   const fulfillRedemption = useCallback((redemptionId) => {
     setRewardRedemptionsState(prev => prev.map(r => r.id === redemptionId ? { ...r, status: 'fulfilled' } : r))
@@ -569,13 +597,15 @@ export const AppProvider = ({ children }) => {
   const unclaimedPhoto = photoQueue.find(p => p.status === 'approved' && !p.claimed) ?? null
   const latestApproval = recentApprovals[recentApprovals.length - 1] ?? null
   const pendingRedemptionCount = rewardRedemptions.filter(r => r.status === 'pending').length
+  const totalBanked = rewardSavings.reduce((sum, s) => sum + s.bankedCoins, 0)
+  const spendableCoins = (kid?.coins ?? 0) - totalBanked
 
   return (
     <AppContext.Provider value={{
       kid, characters, activeCharacterId, activeCharacter,
       chores, completions, pendingCompletions, recentApprovals, latestApproval,
       streaks, photoQueue, settings: mergedSettings, purchaseHistory,
-      customRewards, rewardRedemptions,
+      customRewards, rewardRedemptions, rewardSavings, spendableCoins, kidId,
       lockedChoreIds, pendingPhotoCount, pendingChoreCount, pendingRedemptionCount, unclaimedPhoto,
       setupKid, addChore, updateChore, deleteChore,
       completeChore, approveCompletion, rejectCompletion, dismissApproval,
@@ -583,6 +613,7 @@ export const AppProvider = ({ children }) => {
       submitPhoto, approvePhoto, rejectPhoto, claimPhotoReward,
       setActiveCharacter, renameCharacter, updateSettings,
       addCustomReward, deleteCustomReward, redeemCustomReward, fulfillRedemption, rejectRedemption,
+      bankCoinsToward, withdrawSavings,
     }}>
       {children}
     </AppContext.Provider>

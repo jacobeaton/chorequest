@@ -9,7 +9,7 @@ import CoinDisplay from '../shared/CoinDisplay'
 import { ArrowLeft, Edit2, Check } from 'lucide-react'
 
 export default function LuminRewardsScreen({ onNavigate }) {
-  const { kid, characters, activeCharacterId, activeCharacter, setActiveCharacter, renameCharacter, buyItem, customRewards, redeemCustomReward, rewardRedemptions } = useAppState()
+  const { kid, characters, activeCharacterId, activeCharacter, setActiveCharacter, renameCharacter, buyItem, customRewards, redeemCustomReward, rewardRedemptions, rewardSavings, spendableCoins, bankCoinsToward, withdrawSavings, kidId } = useAppState()
   const [tab, setTab] = useState('companion') // 'companion' | 'collection' | 'shop' | 'rewards'
   const [editing, setEditing] = useState(false)
   const [nameInput, setNameInput] = useState('')
@@ -43,7 +43,7 @@ export default function LuminRewardsScreen({ onNavigate }) {
             <ArrowLeft size={20} className="text-white" />
           </button>
           <h1 className="text-white font-black text-2xl flex-1">Lumins</h1>
-          <CoinDisplay coins={kid?.coins ?? 0} />
+          <CoinDisplay coins={spendableCoins} />
         </div>
 
         {/* Tabs */}
@@ -168,7 +168,7 @@ export default function LuminRewardsScreen({ onNavigate }) {
           <div className="px-4 py-6 space-y-4">
             <p className="text-sm text-gray-500 font-semibold">Real rewards set by your parent 🎁</p>
 
-            {customRewards.length === 0 ? (
+            {customRewards.filter(r => r.assignedKidId === null || r.assignedKidId === kidId).length === 0 ? (
               <div className="text-center py-12 text-gray-300">
                 <p className="text-4xl mb-2">🎁</p>
                 <p className="font-bold text-gray-400">No rewards yet</p>
@@ -176,25 +176,76 @@ export default function LuminRewardsScreen({ onNavigate }) {
               </div>
             ) : (
               <div className="space-y-3">
-                {customRewards.map(reward => {
-                  const canAfford = (kid?.coins ?? 0) >= reward.coinCost
+                {customRewards.filter(r => r.assignedKidId === null || r.assignedKidId === kidId).map(reward => {
+                  const saving = rewardSavings.find(s => s.rewardId === reward.id)
+                  const banked = saving?.bankedCoins ?? 0
+                  const progress = Math.min(banked / reward.coinCost, 1)
+                  const remaining = reward.coinCost - banked
+                  const canBank = spendableCoins > 0 && banked < reward.coinCost
+                  const canRedeem = (spendableCoins + banked) >= reward.coinCost
+                  const canAffordDirect = spendableCoins >= reward.coinCost && banked === 0
                   const pendingCount = rewardRedemptions.filter(r => r.rewardId === reward.id && r.status === 'pending').length
                   return (
-                    <div key={reward.id} className={`bg-white rounded-2xl p-4 shadow-sm flex items-center gap-4 ${!canAfford ? 'opacity-50' : ''}`}>
-                      <span className="text-4xl flex-shrink-0">{reward.emoji}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-black text-gray-800">{reward.name}</p>
-                        <p className="text-sm text-gray-500">{reward.description}</p>
-                        <div className="flex items-center gap-1 mt-1 text-amber-600 font-bold text-sm">🪙 {reward.coinCost}</div>
-                        {pendingCount > 0 && <p className="text-xs text-yellow-600 font-bold mt-1">⏳ {pendingCount} pending</p>}
+                    <div key={reward.id} className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+                      <div className="flex items-start gap-3">
+                        <span className="text-4xl flex-shrink-0">{reward.emoji}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-black text-gray-800">{reward.name}</p>
+                          {reward.description ? <p className="text-sm text-gray-500">{reward.description}</p> : null}
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-amber-600 font-bold text-sm">🪙 {reward.coinCost}</span>
+                            {banked > 0 && <span className="text-green-600 font-bold text-xs">Saved: {banked}</span>}
+                            {pendingCount > 0 && <span className="text-xs text-yellow-600 font-bold">⏳ {pendingCount} pending</span>}
+                          </div>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => redeemCustomReward(reward.id)}
-                        disabled={!canAfford}
-                        className="flex-shrink-0 bg-gradient-to-r from-purple-600 to-violet-500 text-white font-black text-sm px-4 py-2 rounded-xl disabled:opacity-40 active:scale-95 transition-transform"
-                      >
-                        Buy
-                      </button>
+
+                      {banked > 0 && (
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs text-gray-500 font-semibold">
+                            <span>{banked} / {reward.coinCost} coins saved</span>
+                            <span>{Math.round(progress * 100)}%</span>
+                          </div>
+                          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-green-400 rounded-full transition-all" style={{ width: `${progress * 100}%` }} />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex gap-2">
+                        {canAffordDirect ? (
+                          <button
+                            onClick={() => redeemCustomReward(reward.id)}
+                            className="flex-1 bg-gradient-to-r from-purple-600 to-violet-500 text-white font-black text-sm py-2 rounded-xl active:scale-95 transition-transform"
+                          >
+                            Buy Now
+                          </button>
+                        ) : canRedeem && banked > 0 ? (
+                          <button
+                            onClick={() => redeemCustomReward(reward.id)}
+                            className="flex-1 bg-gradient-to-r from-green-500 to-emerald-400 text-white font-black text-sm py-2 rounded-xl active:scale-95 transition-transform"
+                          >
+                            Redeem 🎉
+                          </button>
+                        ) : canBank ? (
+                          <button
+                            onClick={() => bankCoinsToward(reward.id, Math.min(spendableCoins, remaining))}
+                            className="flex-1 bg-blue-500 text-white font-bold text-sm py-2 rounded-xl active:scale-95 transition-transform"
+                          >
+                            {banked > 0 ? `Save ${Math.min(spendableCoins, remaining)} more` : `Start Saving`}
+                          </button>
+                        ) : (
+                          <div className="flex-1 text-center text-xs text-gray-400 py-2">Earn more coins to save!</div>
+                        )}
+                        {banked > 0 && (
+                          <button
+                            onClick={() => withdrawSavings(reward.id)}
+                            className="px-3 py-2 bg-gray-100 text-gray-600 font-bold text-sm rounded-xl active:scale-95 transition-transform"
+                          >
+                            Withdraw
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )
                 })}

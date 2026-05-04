@@ -21,7 +21,7 @@ export default function ParentDashboard({ onNavigate }) {
   const [customRewards, setCustomRewards] = useState([])
   const [rewardRedemptions, setRewardRedemptions] = useState([])
   const [revealedPull, setRevealedPull] = useState({})
-  const [newReward, setNewReward] = useState({ name: '', emoji: '🎁', description: '', coinCost: 100 })
+  const [newReward, setNewReward] = useState({ name: '', emoji: '🎁', description: '', coinCost: 100, assignedKidId: null })
   const [addingReward, setAddingReward] = useState(false)
   const [changingPin, setChangingPin] = useState(false)
   const [newPin, setNewPin] = useState('')
@@ -180,7 +180,7 @@ export default function ParentDashboard({ onNavigate }) {
     if (!newReward.name.trim()) return
     const created = await db.insertCustomReward(session?.user?.id, newReward)
     setCustomRewards(prev => [...prev, created])
-    setNewReward({ name: '', emoji: '🎁', description: '', coinCost: 100 })
+    setNewReward({ name: '', emoji: '🎁', description: '', coinCost: 100, assignedKidId: null })
     setAddingReward(false)
   }
 
@@ -417,6 +417,26 @@ export default function ParentDashboard({ onNavigate }) {
                     className="w-24 border-2 border-purple-100 rounded-xl px-3 py-2 font-black text-gray-800 outline-none focus:border-purple-400 text-sm"
                   />
                 </div>
+                <div>
+                  <span className="text-sm font-bold text-gray-600 block mb-1">For:</span>
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={() => setNewReward(r => ({ ...r, assignedKidId: null }))}
+                      className={`px-3 py-1.5 rounded-xl text-sm font-bold transition-colors ${newReward.assignedKidId === null ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+                    >
+                      All Kids
+                    </button>
+                    {kids.map(k => (
+                      <button
+                        key={k.id}
+                        onClick={() => setNewReward(r => ({ ...r, assignedKidId: k.id }))}
+                        className={`px-3 py-1.5 rounded-xl text-sm font-bold transition-colors ${newReward.assignedKidId === k.id ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-600'}`}
+                      >
+                        {k.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {REWARD_EMOJIS.map(e => (
                     <button key={e} onClick={() => setNewReward(r => ({ ...r, emoji: e }))}
@@ -434,18 +454,21 @@ export default function ParentDashboard({ onNavigate }) {
               </div>
             )}
 
-            {customRewards.map(r => (
-              <div key={r.id} className="bg-white rounded-2xl p-3 shadow-sm flex items-center gap-3">
-                <span className="text-2xl">{r.emoji}</span>
-                <div className="flex-1">
-                  <p className="font-bold text-gray-800 text-sm">{r.name}</p>
-                  <p className="text-xs text-gray-500">{r.description} · 🪙 {r.coinCost}</p>
+            {customRewards.map(r => {
+              const assignedKid = r.assignedKidId ? kids.find(k => k.id === r.assignedKidId) : null
+              return (
+                <div key={r.id} className="bg-white rounded-2xl p-3 shadow-sm flex items-center gap-3">
+                  <span className="text-2xl">{r.emoji}</span>
+                  <div className="flex-1">
+                    <p className="font-bold text-gray-800 text-sm">{r.name}</p>
+                    <p className="text-xs text-gray-500">{r.description} · 🪙 {r.coinCost}{assignedKid ? ` · for ${assignedKid.name}` : ''}</p>
+                  </div>
+                  <button onClick={() => handleDeleteReward(r.id)} className="text-red-400 p-1">
+                    <Trash2 size={16} />
+                  </button>
                 </div>
-                <button onClick={() => handleDeleteReward(r.id)} className="text-red-400 p-1">
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
