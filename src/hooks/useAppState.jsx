@@ -149,6 +149,19 @@ export const AppProvider = ({ children }) => {
     return unsub
   }, [kidId])
 
+  // ─── Realtime: reward suggestion status updates ───────────────────────────────
+
+  useEffect(() => {
+    if (!kidId) return
+    const unsub = db.subscribeToKidRewardSuggestions(kidId, (updated) => {
+      setRewardSuggestionsState(prev => prev.map(s => s.id === updated.id ? updated : s))
+      if (updated.status === 'approved') {
+        db.getCustomRewards().then(rewards => setCustomRewardsState(rewards)).catch(console.error)
+      }
+    })
+    return unsub
+  }, [kidId])
+
   // ─── Merged settings (parentSettings + local) ────────────────────────────────
 
   const mergedSettings = useMemo(() => ({

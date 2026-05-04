@@ -75,6 +75,14 @@ export default function ParentDashboard({ onNavigate }) {
     return unsub
   }, [])
 
+  // Realtime: new reward suggestions
+  useEffect(() => {
+    const unsub = db.subscribeToRewardSuggestions((suggestion) => {
+      setRewardSuggestions(prev => [...prev, suggestion])
+    })
+    return unsub
+  }, [])
+
   const handleApproveCompletion = async (p) => {
     // Fetch the target kid's current data
     const [kidRow, chars] = await Promise.all([

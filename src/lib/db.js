@@ -536,3 +536,36 @@ export const subscribeToPendingPhotos = (onNew) => {
     .subscribe()
   return () => supabase.removeChannel(channel)
 }
+
+export const subscribeToRewardSuggestions = (onNew) => {
+  const channel = supabase
+    .channel('reward_suggestions_new')
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'reward_suggestions',
+    }, async (payload) => {
+      // Fetch with kid name join since payload.new won't have it
+      const { data } = await supabase
+        .from('reward_suggestions')
+        .select('*, kids(name)')
+        .eq('id', payload.new.id)
+        .single()
+      if (data) onNew(rowToSuggestion(data))
+    })
+    .subscribe()
+  return () => supabase.removeChannel(channel)
+}
+
+export const subscribeToKidRewardSuggestions = (kidId, onChange) => {
+  const channel = supabase
+    .channel(`reward_suggestions_kid_${kidId}`)
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'reward_suggestions',
+      filter: `kid_id=eq.${kidId}`,
+    }, (payload) => onChange(rowToSuggestion(payload.new)))
+    .subscribe()
+  return () => supabase.removeChannel(channel)
+}
