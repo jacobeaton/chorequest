@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { localToday } from '../../utils/dateUtils'
+import { localToday, localDateOf } from '../../utils/dateUtils'
 import { useAppState } from '../../hooks/useAppState'
 import { CHARACTERS } from '../../config/characters'
 import { BALANCE } from '../../config/balance'
@@ -161,7 +161,7 @@ function PhotoResultScreen({ photo, onNavigate }) {
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function PhotoSubmitScreen({ onNavigate }) {
-  const { submitPhoto, settings, unclaimedPhoto, photoQueue } = useAppState()
+  const { submitPhoto, unclaimedPhoto, photoQueue } = useAppState()
   const [preview, setPreview] = useState(null)
   const [submitted, setSubmitted] = useState(false)
   const fileRef = useRef(null)
@@ -170,9 +170,10 @@ export default function PhotoSubmitScreen({ onNavigate }) {
     return <PhotoResultScreen photo={unclaimedPhoto} onNavigate={onNavigate} />
   }
 
-  const pendingPhoto = photoQueue.find(p => p.status === 'pending')
   const today = localToday()
-  const alreadySubmitted = !pendingPhoto && settings.lastPhotoSubmissionDate === today
+  const pendingPhoto = photoQueue.find(p => p.status === 'pending')
+  const claimedToday = photoQueue.some(p => p.claimed && localDateOf(p.submittedAt) === today)
+  const alreadySubmitted = !pendingPhoto && claimedToday
 
   const handleFile = (e) => {
     const file = e.target.files?.[0]

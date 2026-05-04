@@ -375,26 +375,24 @@ export const AppProvider = ({ children }) => {
 
   const submitPhoto = useCallback(async (photoDataUrl) => {
     const t = today()
-    if (settings.lastPhotoSubmissionDate === t) return false
+    const hasPending = photoQueue.some(p => p.status === 'pending')
+    const claimedToday = photoQueue.some(p => p.claimed && localDateOf(p.submittedAt) === t)
+    if (hasPending || claimedToday) return false
 
     const entry = { id: nanoid(), photoDataUrl, submittedAt: new Date().toISOString(), status: 'pending', pullResult: null }
     setPhotoQueueState(prev => [...prev, entry])
-    setSettingsState(prev => ({ ...prev, lastPhotoSubmissionDate: t }))
 
     if (kidId) {
       try {
         const photoPath = await db.uploadPhoto(kidId, photoDataUrl)
         const dbEntry = await db.insertPhotoQueue(kidId, photoPath)
-        // Update the local entry's ID to match Supabase
         setPhotoQueueState(prev => prev.map(p => p.id === entry.id ? { ...p, id: dbEntry.id, photoPath } : p))
-        await db.updateKid(kidId, { lastPhotoSubmissionDate: t })
       } catch (err) {
         console.error('submitPhoto Supabase error:', err)
-        // Keep local entry even if upload fails
       }
     }
     return true
-  }, [settings.lastPhotoSubmissionDate, kidId])
+  }, [photoQueue, kidId])
 
   const approvePhoto = useCallback((photoId) => {
     const ownedIds = characters.map(c => c.id)
